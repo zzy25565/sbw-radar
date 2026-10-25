@@ -1,0 +1,64 @@
+{
+  "_comment": "Radar addon ammo table. Matched against the projectile id that the vehicle weapon fires. Everything here is data: tune values without touching code.",
+  "ammo": {
+    "superbwarfare:ru_9m336": {
+      "category": "RADAR",
+      "missileEntity": "superbwarfare:ru_9m336",
+      "seekerRange": 96,
+      "climbTicks": 12,
+      "climbUpDeg": 10,
+      "maxPerRadar": 2
+    },
+    "superbwarfare:ru_9m100": {
+      "category": "RADAR",
+      "missileEntity": "superbwarfare:ru_9m100",
+      "seekerRange": 64,
+      "climbTicks": 8,
+      "climbUpDeg": 8,
+      "maxPerRadar": 4
+    },
+    "superbwarfare:ru_3m14": {
+      "category": "RADAR",
+      "missileEntity": "superbwarfare:ru_3m14",
+      "seekerRange": 160,
+      "climbTicks": 20,
+      "climbUpDeg": 6,
+      "maxPerRadar": 1
+    },
+    "superbwarfare:kh_39": {
+      "category": "RADAR",
+      "missileEntity": "superbwarfare:kh_39",
+      "seekerRange": 128,
+      "climbTicks": 14,
+      "climbUpDeg": 9,
+      "maxPerRadar": 1
+    },
+    "superbwarfare:fim_92_missile": {
+      "category": "IR",
+      "missileEntity": "superbwarfare:fim_92_missile",
+      "seekerRange": 64,
+      "climbTicks": 6,
+      "climbUpDeg": 4,
+      "flareChance": 0.6,
+      "requireLock": true
+    },
+    "superbwarfare:igla_9k38_missile": {
+      "category": "IR",
+      "missileEntity": "superbwarfare:igla_9k38_missile",
+      "seekerRange": 72,
+      "climbTicks": 6,
+      "climbUpDeg": 5,
+      "flareChance": 0.65,
+      "requireLock": true
+    },
+    "superbwarfare:javelin_missile": {
+      "category": "IR",
+      "missileEntity": "superbwarfare:javelin_missile",
+      "seekerRange": 80,
+      "climbTicks": 10,
+      "climbUpDeg": 18,
+      "flareChance": 0.2,
+      "requireLock": true
+    }
+  }
+}

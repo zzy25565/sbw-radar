@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="GPL-3.0-only"
+
+[[mods]]
+modId="sbw_radar"
+version="${file.jarVersion}"
+displayName="SBW Radar - AA Fire Control"
+authors="zzy"
+description='''AA-vehicle radar targeting for Superb Warfare. Injects an airborne-only radar into stock AA vehicles and exposes an open API for other addons. Compatible with SBW 0.8.9.1 / 0.8.9.2.
+
+1.6.0: heavy ERA and hard-kill APS were split into the standalone "主防与爆反" addon (sbw_defense). Install that mod for reactive armour / active protection.'''
+
+[[dependencies.sbw_radar]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.203,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sbw_radar]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.22)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sbw_radar]]
+modId="superbwarfare"
+type="required"
+versionRange="[0.8.9.1,)"
+ordering="AFTER"
+side="BOTH"

@@ -1,0 +1,17 @@
+{
+  "sbw_radar.configuration.radar.range": "雷达探测距离（格）",
+  "sbw_radar.configuration.radar.sweepAngle": "扇面角度（度，360 为全向）",
+  "sbw_radar.configuration.radar.rotationSpeed": "扇面转速（度/刻）",
+  "sbw_radar.configuration.radar.minTargetHeight": "目标最低高度（绝对 Y，防空车仅探空中）",
+  "sbw_radar.configuration.radar.maxTargetHeight": "目标最高高度（绝对 Y）",
+  "sbw_radar.configuration.radar.scanInterval": "扫描间隔（刻）",
+  "sbw_radar.configuration.radar.shareWithTeammates": "与队友共享雷达情报",
+  "item.sbw_radar.chaff": "箔条干扰弹",
+  "item.sbw_radar.flare": "红外热诱弹",
+  "key.categories.sbw_radar": "SBW 雷达",
+  "key.sbw_radar.cycle_mode": "切换雷达模式",
+  "key.sbw_radar.cycle_target": "切换锁定目标",
+  "key.sbw_radar.cycle_width": "切换扫描宽度",
+  "key.sbw_radar.flare": "投放热诱弹",
+  "key.sbw_radar.chaff": "投放箔条"
+}

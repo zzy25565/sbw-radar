@@ -1,0 +1,13 @@
+{
+  "_comment": "Per-vehicle radar profiles. Omni=false means a fixed directional antenna: the beam sweeps only inside Sector degrees around the hull heading. Intervals are scan refresh rates in ticks.",
+  "vehicles": {
+    "buk_m3":      { "Omni": false, "Sector": 60,  "SweepSpeed": 1.2, "SrcInterval": 4, "TwsInterval": 20, "TrkInterval": 1, "Modes": ["SRC", "TWS", "TRK"] },
+    "buk_radar":   { "Omni": false, "Sector": 90,  "SweepSpeed": 1.4, "SrcInterval": 4, "TwsInterval": 18, "TrkInterval": 1, "Modes": ["SRC", "TWS", "TRK"] },
+    "s400_launcher": { "Omni": false, "Sector": 60, "SweepSpeed": 1.0, "SrcInterval": 5, "TwsInterval": 22, "TrkInterval": 1, "Modes": ["SRC", "TWS", "TRK"] },
+    "s400_radar":  { "Omni": true,  "Sector": 120, "SweepSpeed": 1.6, "SrcInterval": 4, "TwsInterval": 16, "TrkInterval": 1, "Modes": ["SRC", "TWS", "TRK"] },
+    "625e":        { "Omni": true,  "Sector": 120, "SweepSpeed": 1.8, "SrcInterval": 3, "TwsInterval": 15, "TrkInterval": 1, "Modes": ["SRC", "TRK"] },
+    "tunguska":    { "Omni": true,  "Sector": 120, "SweepSpeed": 1.8, "SrcInterval": 4, "TwsInterval": 18, "TrkInterval": 1, "Modes": ["SRC", "TWS", "TRK"] },
+    "l1a2":        { "Omni": true,  "Sector": 100, "SweepSpeed": 2.0, "SrcInterval": 3, "TwsInterval": 14, "TrkInterval": 1, "Modes": ["SRC", "TRK"] },
+    "zsu234":      { "Omni": true,  "Sector": 90,  "SweepSpeed": 2.2, "SrcInterval": 3, "TwsInterval": 16, "TrkInterval": 1, "Modes": ["SRC", "TRK"] }
+  }
+}

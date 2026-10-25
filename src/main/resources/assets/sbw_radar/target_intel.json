@@ -1,0 +1,14 @@
+{
+  "_comment": "Engine count per aircraft/helicopter, keyed by entity type path. Third-party addons may append their own entries.",
+  "vehicles": {
+    "j10": 1, "j10c": 1, "j11": 2, "j15t": 2, "j16": 2, "j20": 2, "j20vtol": 2,
+    "j35": 2, "j8": 2, "jf17": 1, "jas39e": 1,
+    "f14": 2, "f15e": 2, "f16c": 1, "f4u": 1, "fa18e": 2, "av8b": 1,
+    "q5": 2, "su24m": 2, "refale": 2, "camel": 1,
+    "ik_fightcat": 1, "ik_locust": 1, "syy651": 1, "spacebag": 1, "tjgc": 2,
+    "t77h": 4, "ac130": 4,
+    "ah1f": 1, "ah64": 2, "ec665": 2, "ka50": 2, "mi24p": 2, "mi24v": 2,
+    "nh90": 2, "sd905": 1, "test_ship": 2, "uh144": 2, "uh60": 2,
+    "z10a": 2, "z10me": 2, "z20": 2, "z9": 2
+  }
+}

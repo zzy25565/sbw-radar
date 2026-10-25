@@ -1,0 +1,336 @@
+package com.zzy.sbwradar;
+
+import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler;
+import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler.ClientSyncedEntity;
+import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler.SyncedRadar;
+import com.atsuishio.superbwarfare.entity.vehicle.base.VehicleEntity;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import org.joml.Vector3f;
+
+import java.util.List;
+
+/**
+ * Client-side radar HUD:
+ *  - 2D radar scope (bottom-left) while riding a vehicle covered by a synced radar.
+ *  - 3D lead reticle (world space): diamond showing where to aim at the nearest hostile,
+ *    solved iteratively with the target velocity synced by SBW's BVR handler.
+ */
+public final class ClientRenderers {
+
+    private static final int COL_BG = 0x9958C98A;          // 浅绿底（半透明）
+    private static final int COL_SCAN_FILL = 0xCC0A3D1E;   // 深绿 = 本机当前扫描覆盖区
+    private static final int COL_RING = 0xFF0F6E56;
+    private static final int COL_SWEEP = 0xFF1D9E75;
+    private static final int COL_TEXT = 0xFF5DCAA5;
+    private static final int COL_DATALINK = 0xFF66CCFF;   // contact received over the datalink
+    private static final int COL_HOSTILE = 0xFFE24B4A;
+    private static final int COL_NEUTRAL = 0xFFB4B2A9;
+
+    // ── entry registration helpers ──
+
+    /** HUD shows while the player is inside any synced radar's coverage radius. */
+    public static boolean ridingCoveredVehicle(Player player) {
+        if (!(player.getVehicle() instanceof VehicleEntity v) || v.isWreck()) return false;
+        List<SyncedRadar> radars = ClientSyncedEntityHandler.getSyncedRadars(player.level());
+        if (radars.isEmpty()) return false;
+        for (SyncedRadar r : radars) {
+            if (r.getPos().distanceToSqr(player.position()) <= r.getRadius() * r.getRadius()) return true;
+        }
+        return false;
+    }
+
+    private static SyncedRadar nearestRadar(Player player) {
+        SyncedRadar best = null;
+        double bestD = Double.MAX_VALUE;
+        for (SyncedRadar r : ClientSyncedEntityHandler.getSyncedRadars(player.level())) {
+            double d = r.getPos().distanceToSqr(player.position());
+            if (d < bestD) {
+                bestD = d;
+                best = r;
+            }
+        }
+        return best;
+    }
+
+    // ── 2D radar scope ──
+
+    @SubscribeEvent
+    public static void onRenderGui(RenderGuiEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        if (player == null || !SbwRadarClientConfig.HUD_ENABLE.get()) return;
+        if (!ridingCoveredVehicle(player)) return;
+
+        SyncedRadar radar = nearestRadar(player);
+        if (radar == null) return;
+
+        GuiGraphics g = event.getGuiGraphics();
+        Font font = mc.font;
+        int r = SbwRadarClientConfig.HUD_SIZE.get();
+        int cx = 24 + r;
+        int cy = g.guiHeight() - 24 - r;
+
+        // background disc (scanline fill)
+        for (int dy = -r; dy <= r; dy++) {
+            int dx = (int) Math.sqrt((double) r * r - (double) dy * dy);
+            g.fill(cx - dx, cy + dy, cx + dx, cy + dy + 1, COL_BG);
+        }
+        // range rings
+        ring(g, cx, cy, r, COL_RING);
+        ring(g, cx, cy, r / 2, COL_RING);
+        g.fill(cx - 1, cy - 1, cx + 1, cy + 1, COL_SWEEP);
+
+        // scanned area: filled dark green wedge (whole disc when the antenna is omni)
+        double sweep = radar.getSweepAngle();
+        if (sweep >= 359.0) {
+            fillDisc(g, cx, cy, r, COL_SCAN_FILL);
+            g.fill(cx - 1, cy - 1, cx + 1, cy + 1, COL_SWEEP);
+        } else {
+            double step = 0.5;
+            for (double a = -sweep / 2.0; a <= sweep / 2.0; a += step) {
+                line(g, cx, cy, radar.getYRot() + a, r, COL_SCAN_FILL);
+            }
+            g.fill(cx - 1, cy - 1, cx + 1, cy + 1, COL_SWEEP);
+        }
+        line(g, cx, cy, radar.getYRot(), r, COL_SWEEP);
+        // redraw the rings on top of the dark green fill so they stay readable
+        ring(g, cx, cy, r, COL_RING);
+        ring(g, cx, cy, r / 2, COL_RING);
+        // sector boundaries: make the scanned cone obvious for non-omni antennas
+        if (sweep < 359.0) {
+            line(g, cx, cy, radar.getYRot() - sweep / 2.0, r, 0x6633DDAA);
+            line(g, cx, cy, radar.getYRot() + sweep / 2.0, r, 0x6633DDAA);
+        }
+
+        // blips (north-up); returns how many came from the datalink
+        int datalink = drawBlips(g, mc, cx, cy, r, radar);
+
+        // labels
+        g.drawString(font, "N", cx - 3, cy - r - 12, COL_TEXT);
+        g.drawString(font, (int) radar.getRadius() + "m", cx + 4, cy - r + 4, COL_RING);
+        // radar mode / lock readout
+        Entity riddenEntity = player.getVehicle();
+        ClientRadarState.State st = riddenEntity != null ? ClientRadarState.get(riddenEntity.getId()) : null;
+        if (ClientIrState.isLocked()) {
+            String ir = "IR LOCK  " + ClientIrState.getDistance() + "m";
+            g.drawString(font, ir, cx - 28, cy - r - 12, 0xFFFF9D9D);
+        }
+
+        // scan direction readout (relative to the hull) + datalink contact count
+        if (sweep < 359.0) {
+            Entity ridden = player.getVehicle();
+            if (ridden != null) {
+                double rel = ((radar.getYRot() - ridden.getYRot()) % 360.0 + 540.0) % 360.0 - 180.0;
+                String scan = String.format("SCAN %+04d°  ±%d°", Math.round(rel), Math.round(sweep / 2.0));
+                g.drawString(font, scan, cx - 34, cy - r - 24, 0xFF33DDAA);
+            }
+        }
+        if (datalink > 0) {
+            g.drawString(font, "DL " + datalink, cx + r + 4, cy - r + 4, COL_DATALINK);
+        }
+
+        if (st != null) {
+            String modeLine = switch (st.mode()) {
+                case "TWS" -> "TWS x" + st.trackedCount();
+                case "TRK" -> st.targetName().isEmpty() ? "TRK" : "TRK " + st.targetName();
+                default -> "SRC";
+            };
+            modeLine = modeLine + "  " + st.widthDeg() + "°";
+            g.drawString(font, modeLine, cx - 14, cy + r + 4, 0xFFFAC775);
+        }
+    }
+
+    private static void fillDisc(GuiGraphics g, int cx, int cy, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int dx = (int) Math.sqrt((double) r * r - (double) dy * dy);
+            g.fill(cx - dx, cy + dy, cx + dx, cy + dy + 1, color);
+        }
+    }
+
+    private static void ring(GuiGraphics g, int cx, int cy, int r, int color) {
+        for (double a = 0; a < 360.0; a += 3.0) {
+            int px = cx + (int) Math.round(Math.cos(Math.toRadians(a)) * r);
+            int py = cy + (int) Math.round(Math.sin(Math.toRadians(a)) * r);
+            g.fill(px, py, px + 1, py + 1, color);
+        }
+    }
+
+    private static void line(GuiGraphics g, int cx, int cy, double yRotDeg, int r, int color) {
+        double rad = Math.toRadians(yRotDeg);
+        // world yaw: 0 = +Z (south, screen down); screen: x = sin, y = cos
+        int ex = cx + (int) Math.round(Mth.sin((float) rad) * r);
+        int ey = cy + (int) Math.round(Mth.cos((float) rad) * r);
+        int steps = r / 2;
+        for (int i = 1; i <= steps; i++) {
+            double f = (double) i / steps;
+            int px = cx + (int) Math.round((ex - cx) * f);
+            int py = cy + (int) Math.round((ey - cy) * f);
+            g.fill(px, py, px + 1, py + 1, color);
+        }
+    }
+
+    private static int drawBlips(GuiGraphics g, Minecraft mc, int cx, int cy, int r, SyncedRadar radar) {
+        int[] linked = {0};
+        drawBlipGroup(g, mc, cx, cy, r, radar,
+                ClientSyncedEntityHandler.getSyncedHostileEntities(mc.level), COL_HOSTILE, linked);
+        drawBlipGroup(g, mc, cx, cy, r, radar,
+                ClientSyncedEntityHandler.getSyncedNeutralEntities(mc.level), COL_NEUTRAL, linked);
+        return linked[0];
+    }
+
+    /** Signed difference a-b normalised to [-180, 180]. */
+    private static double angleDelta(double a, double b) {
+        return ((a - b) % 360.0 + 540.0) % 360.0 - 180.0;
+    }
+
+    private static void drawBlipGroup(GuiGraphics g, Minecraft mc, int cx, int cy, int r,
+                                      SyncedRadar radar, List<Entity> entities, int color, int[] linked) {
+        double sweep = radar.getSweepAngle();
+        boolean directional = sweep < 359.0;
+        for (Entity e : entities) {
+            Vec3 rel = ClientSyncedEntityHandler.getExtrapolatedPos(mc.level, e).subtract(radar.getPos());
+            double dist = Math.sqrt(rel.x * rel.x + rel.z * rel.z);
+            double scale = Math.min(dist, radar.getRadius()) / radar.getRadius() * r;
+            double len = Math.max(dist, 0.001);
+            int bx = cx + (int) Math.round(rel.x / len * scale);
+            int by = cy + (int) Math.round(rel.z / len * scale);
+            // outside the current scan cone => this contact can only come from the datalink
+            boolean fromLink = false;
+            if (directional) {
+                double bearing = Math.toDegrees(Math.atan2(rel.x, rel.z));
+                fromLink = Math.abs(angleDelta(bearing, radar.getYRot())) > sweep / 2.0;
+            }
+            if (fromLink) {
+                linked[0]++;
+                int dlColor = color == COL_HOSTILE ? COL_DATALINK : 0x8866CCFF;
+                // hollow square: distinct from own-scan contacts
+                g.fill(bx - 2, by - 2, bx + 3, by - 1, dlColor);
+                g.fill(bx - 2, by + 2, bx + 3, by + 3, dlColor);
+                g.fill(bx - 2, by - 2, bx - 1, by + 3, dlColor);
+                g.fill(bx + 2, by - 2, bx + 3, by + 3, dlColor);
+                continue;
+            }
+            if (color == COL_HOSTILE && dist <= radar.getRadius()) {
+                // diamond for hostiles
+                g.fill(bx - 2, by - 2, bx + 3, by + 3, 0x00000000);
+                g.fill(bx, by - 3, bx + 1, by + 4, color);
+                g.fill(bx - 3, by, bx + 4, by + 1, color);
+            } else {
+                g.fill(bx - 1, by - 1, bx + 2, by + 2, color);
+            }
+        }
+    }
+
+    // ── 3D lead reticle ──
+
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        if (player == null || !SbwRadarClientConfig.LEAD_ENABLE.get()) return;
+        Entity ridden = player.getVehicle();
+        if (!(ridden instanceof VehicleEntity vehicle) || vehicle.isWreck()) return;
+
+        Entity target = nearestHostile(player);
+        if (target == null) return;
+
+        Vec3 muzzle = player.getVehicle().position().add(0.0, 1.5, 0.0);
+        Vec3 targetPos = ClientSyncedEntityHandler.getExtrapolatedPos(mc.level, target);
+        Vec3 velocity = targetVelocity(mc, target);
+        Vec3 lead = solveLead(muzzle, targetPos, velocity, SbwRadarClientConfig.LEAD_SPEED.get());
+        if (lead == null) return;
+
+        Camera camera = event.getCamera();
+        Vec3 camPos = camera.getPosition();
+        PoseStack pose = event.getPoseStack();
+        pose.pushPose();
+        pose.translate(-camPos.x, -camPos.y, -camPos.z);
+
+        Vector3f right = rotateAxes(camera, new Vector3f(1, 0, 0));
+        Vector3f up = rotateAxes(camera, new Vector3f(0, 1, 0));
+
+        VertexConsumer buf = mc.renderBuffers().bufferSource().getBuffer(RenderType.lines());
+        double size = Math.max(0.35, lead.distanceTo(camPos) * 0.012);
+
+        // diamond outline (billboard)
+        Vec3 p1 = lead.add(up.x * size, up.y * size, up.z * size);
+        Vec3 p2 = lead.add(right.x * size, right.y * size, right.z * size);
+        Vec3 p3 = lead.add(-up.x * size, -up.y * size, -up.z * size);
+        Vec3 p4 = lead.add(-right.x * size, -right.y * size, -right.z * size);
+        line3d(buf, pose, p1, p2);
+        line3d(buf, pose, p2, p3);
+        line3d(buf, pose, p3, p4);
+        line3d(buf, pose, p4, p1);
+
+        // dashed guide from target to lead position
+        Vec3 mid = targetPos.add(lead).scale(0.5);
+        line3d(buf, pose, targetPos, mid);
+
+        mc.renderBuffers().bufferSource().endBatch(RenderType.lines());
+        pose.popPose();
+    }
+
+    private static Entity nearestHostile(Player player) {
+        Entity best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Entity e : ClientSyncedEntityHandler.getSyncedHostileEntities(player.level())) {
+            double d = e.distanceToSqr(player);
+            if (d < bestD) {
+                bestD = d;
+                best = e;
+            }
+        }
+        return best;
+    }
+
+    private static Vec3 targetVelocity(Minecraft mc, Entity target) {
+        Entity real = mc.level.getEntity(target.getId());
+        if (real != null) return real.getDeltaMovement();
+        ClientSyncedEntity entry = ClientSyncedEntityHandler.getSyncedEntry(mc.level, target.getId());
+        return entry != null ? entry.getVelocity() : Vec3.ZERO;
+    }
+
+    /** Iterative flat-fire intercept: t = dist/speed, lead = target + vel * t. */
+    public static Vec3 solveLead(Vec3 muzzle, Vec3 targetPos, Vec3 vel, double speed) {
+        double t = targetPos.distanceTo(muzzle) / speed;
+        Vec3 lead = null;
+        for (int i = 0; i < 4; i++) {
+            lead = targetPos.add(vel.scale(t));
+            t = lead.distanceTo(muzzle) / speed;
+        }
+        return lead;
+    }
+
+    private static Vector3f rotateAxes(Camera camera, Vector3f vec) {
+        Vector3f out = new Vector3f(vec);
+        out.rotate(camera.rotation());
+        return out;
+    }
+
+    private static void line3d(VertexConsumer buf, PoseStack pose, Vec3 a, Vec3 b) {
+        double dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 0.001) return;
+        float nx = (float) (dx / len), ny = (float) (dy / len), nz = (float) (dz / len);
+        buf.addVertex(pose.last().pose(), (float) a.x, (float) a.y, (float) a.z)
+                .setColor(0x9F, 0xE1, 0xCB, 0xC0).setNormal(nx, ny, nz);
+        buf.addVertex(pose.last().pose(), (float) b.x, (float) b.y, (float) b.z)
+                .setColor(0x9F, 0xE1, 0xCB, 0xC0).setNormal(nx, ny, nz);
+    }
+
+    private ClientRenderers() {}
+}

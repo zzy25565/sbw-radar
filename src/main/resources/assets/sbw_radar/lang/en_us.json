@@ -1,0 +1,10 @@
+{
+  "item.sbw_radar.chaff": "Chaff Cartridge",
+  "item.sbw_radar.flare": "IR Flare Cartridge",
+  "key.categories.sbw_radar": "SBW Radar",
+  "key.sbw_radar.cycle_mode": "Cycle Radar Mode",
+  "key.sbw_radar.cycle_target": "Cycle Locked Target",
+  "key.sbw_radar.cycle_width": "Cycle Scan Width",
+  "key.sbw_radar.flare": "Dispense Flare",
+  "key.sbw_radar.chaff": "Dispense Chaff"
+}
