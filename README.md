@@ -48,3 +48,11 @@ gradle jar            # 产物在 build/libs/
 因运行时链接 GPL-3.0 组件，本附属同样以 **GPL-3.0** 分发。若需其他许可安排，请自行确认合规性。
 
 本仓库**不包含**任何第三方游戏资源（War Thunder 模型与贴图等），也不包含构建所需的依赖 jar（`libs/` 已列入 `.gitignore`）。
+
+## 依赖关系
+
+| 方向 | 项目 | 说明 |
+|---|---|---|
+| 运行依赖 | Superb Warfare (GPL-3.0) | 必需 |
+| 被依赖 | [sbw-vls](https://github.com/zzy25565/sbw-vls) | 该载具包中的防空车（Tunguska / Pantsir / Buk）依赖本模组的雷达 HUD、TWS 制导、弹药拦截与近炸引信 |
+| 可选搭配 | [sbw-loadout](https://github.com/zzy25565/sbw-loadout) | 自定义挂载附属 1.2.0 起与本模组联动，提供雷达弹 |
