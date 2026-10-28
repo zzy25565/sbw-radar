@@ -19,6 +19,13 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.sbw_radar]]
+modId="sbw_loadout"
+type="optional"
+versionRange="[1.3.4,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.sbw_radar]]
 modId="minecraft"
 type="required"
 versionRange="[1.21.1,1.22)"

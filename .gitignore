@@ -1,5 +1,9 @@
 # build output
 build/
+.gradle/
+validation/
+__pycache__/
+*.pyc
 out/
 *.class
 *.jar

@@ -46,6 +46,7 @@ public final class ServerRadarHandler {
         double phase;
         List<Integer> lastHostiles = new ArrayList<>();
         int syncCooldown;
+        int lastScanTick = Integer.MIN_VALUE;
     }
 
     @SubscribeEvent
@@ -102,7 +103,7 @@ public final class ServerRadarHandler {
         }
         boolean airborne = false;
         if (provided == null) {
-            if (ctx.vehicle().hasNativeRadar()) return;
+            if (ctx.vehicle().hasNativeRadar() && !LoadoutIntegration.handles(player,vehicle)) return;
             if (vehicle.getVehicleType() == VehicleType.AA) {
                 // ground AA radar
             } else if (SbwRadarConfig.AIRBORNE_ENABLE.get()
@@ -148,6 +149,7 @@ public final class ServerRadarHandler {
             result = applyVerticalLimit(level, vehicle, state, result);
             result.sendToClients(player, level, SbwRadarConfig.SHARE_WITH_TEAMMATES.get());
             state.lastHostiles = new ArrayList<>(result.getHostileIds());
+            state.lastScanTick = level.getServer().getTickCount();
         }
 
         if (--state.syncCooldown <= 0) {
@@ -161,7 +163,7 @@ public final class ServerRadarHandler {
                         target == null ? "" : target.getName().getString(),
                         state.lastHostiles.size(),
                         (int) Math.round(state.widthDeg > 0 ? state.widthDeg : 60.0),
-                        RadarMissileControl.activeFor(vehicle.getId()),
+                        RadarMissileControl.ownActiveFor(vehicle.getId()) + LoadoutIntegration.activeFor(vehicle),
                         CounterMeasures.chaffCount(vehicle)));
             }
         }
@@ -405,6 +407,13 @@ public final class ServerRadarHandler {
     public static boolean isTracked(int vehicleId, int entityId) {
         VehicleState s = STATES.get(vehicleId);
         return s != null && s.lastHostiles.contains(entityId);
+    }
+
+    public static boolean hasFreshTrack(VehicleEntity vehicle, int targetId) {
+        VehicleState state=STATES.get(vehicle.getId());
+        if(state==null || !(vehicle.level() instanceof ServerLevel level)) return false;
+        long age=(long)level.getServer().getTickCount()-state.lastScanTick;
+        return age>=0 && age<=40 && state.lastHostiles.contains(targetId);
     }
 
     // ── client requests ──

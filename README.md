@@ -1,5 +1,13 @@
 # SBW Radar
 
+当前版本 **1.6.4**（2026-10-28）。[下载正式版](https://github.com/zzy25565/sbw-radar/releases/tag/v1.6.4)；空空导弹联动配套 [sbw-loadout 1.3.4](https://github.com/zzy25565/sbw-loadout/releases/tag/v1.3.4)。客户端和服务端同时更新两个 JAR，移出旧版。
+
+本次仅接入挂载模组的空空导弹：AIM-54A/C、PL-12/12A、R-40RD/TD、R-73/73L、R-77/77-1。雷达弹共用 TRK / TWS、照射通道与箔条；红外弹共用热目标锁定与热诱弹，直接登记已发射的挂载弹体，不另外生成导弹。Kh-38MT 空地弹和航弹不接入空空红外接口；既有 9M336 雷达联动保留。
+
+空空弹爆炸伤害由配套挂载 1.3.4 降低为旧值的 50%，直击和爆炸半径保留。联动近炸调用弹体自身 SBW 爆炸，避免绕过弹药伤害。自机、乘员、友军及遮挡目标不触发联动近炸；箔条/热诱后脱锁状态保留至相应弹体存档。
+
+默认 O 切模式、J 切 TRK 目标、P 切宽度、G 热诱弹、H 箔条。修复单独按 G/H 被提前忽略的问题。已有 options.txt 不自动重写，旧 K/L 键位请自行调整。SBW 将无队伍驾驶员的载具列为中立；雷达导弹只接受服务端敌方航迹。联合操作和验收见 [挂载适配说明](https://github.com/zzy25565/sbw-loadout/blob/main/docs/空空导弹适配_1.3.4.md)。
+
 Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 
 ## 功能
@@ -147,3 +155,15 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 ```bash
 gradle jar            # 产物在 build/libs/
 ```
+
+编译 1.6.4 时还需相邻 `../sbw_loadout/build/libs/sbw-loadout-1.3.4.jar` 作为可选接口的 compileOnly 依赖，发布 JAR 不包含挂载代码。若有配套挂载的 NeoForge 开发环境，可复用其已解析依赖，省去准备以上离线依赖：
+
+```powershell
+# 在 sbw_loadout 目录，JDK 21
+.\gradlew.bat build exportCompileClasspath
+.\gradlew.bat -p ..\sbw_radar '-PsharedClasspathFile=../sbw_loadout/build/radar-compile-classpath.txt' build
+.\gradlew.bat -Pgametest -PradarCompat runGameTestServer
+```
+
+两个模组均可独立运行；同装时最低配套版本为挂载 1.3.4 / 雷达 1.6.4。生产构建完毕应在挂载目录执行不带 gametest、radarCompat 或 smoke 参数的 `clean build`，排除开发夹具。
+

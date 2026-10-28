@@ -73,6 +73,7 @@ public final class RadarMissileControl {
         if (!(shooter instanceof Player player)) return;
         Entity ridden = player.getVehicle();
         if (!(ridden instanceof VehicleEntity vehicle) || vehicle.isWreck()) return;
+        if (LoadoutIntegration.handles(player,vehicle)) return;
 
         String typeId = BuiltInRegistries.ENTITY_TYPE.getKey(vehicle.getType()).toString();
         if (!SbwRadarConfig.MISSILE_VEHICLES.get().contains(typeId)) return;
@@ -488,9 +489,13 @@ public final class RadarMissileControl {
 
     /** Missiles currently guided by a radar (for diagnostics/HUD). */
     public static int activeFor(int vehicleId) {
+        return ownActiveFor(vehicleId);
+    }
+
+    public static int ownActiveFor(int vehicleId) {
         int n = 0;
         for (Guided g : GUIDED.values()) {
-            if (g.radarVehicleId == vehicleId) n++;
+            if (g.radarVehicleId == vehicleId && !g.terminal) n++;
         }
         return n;
     }

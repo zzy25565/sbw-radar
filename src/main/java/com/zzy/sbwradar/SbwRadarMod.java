@@ -24,6 +24,8 @@ public final class SbwRadarMod {
     public static final Logger LOGGER = LoggerFactory.getLogger("SBW Radar");
 
     public SbwRadarMod(net.neoforged.bus.api.IEventBus bus) {
+        bus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+                e.enqueueWork(LoadoutIntegration::install));
         CounterItems.init(bus);
         ModLoadingContext.get().getActiveContainer().registerConfig(ModConfig.Type.SERVER, SbwRadarConfig.SPEC);
         ModLoadingContext.get().getActiveContainer().registerConfig(ModConfig.Type.CLIENT, SbwRadarClientConfig.SPEC);

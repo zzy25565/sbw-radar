@@ -13,14 +13,15 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Client keybinds for radar control:
- *   K - cycle radar mode (SRC / TWS / TRK)
+ *   O - cycle radar mode (SRC / TWS / TRK)
+ *   P - cycle scan width (leave K/L available to loadout guidance)
  *   J - cycle locked target (TRK only)
  * (B is taken by the ZZY vehicles launch animation, R by SBW reload.)
  */
 public final class ClientInput {
 
     public static final KeyMapping CYCLE_MODE = new KeyMapping(
-            "key.sbw_radar.cycle_mode", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_K, "key.categories.sbw_radar");
+            "key.sbw_radar.cycle_mode", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, "key.categories.sbw_radar");
 
     public static final KeyMapping CYCLE_TARGET = new KeyMapping(
             "key.sbw_radar.cycle_target", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, "key.categories.sbw_radar");
@@ -32,7 +33,7 @@ public final class ClientInput {
             "key.sbw_radar.chaff", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, "key.categories.sbw_radar");
 
     public static final KeyMapping CYCLE_WIDTH = new KeyMapping(
-            "key.sbw_radar.cycle_width", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_L, "key.categories.sbw_radar");
+            "key.sbw_radar.cycle_width", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P, "key.categories.sbw_radar");
 
     public static final KeyMapping CYCLE_VERTICAL = new KeyMapping(
             "key.sbw_radar.cycle_vertical", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_SEMICOLON, "key.categories.sbw_radar");

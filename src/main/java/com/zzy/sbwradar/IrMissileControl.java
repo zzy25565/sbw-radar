@@ -79,6 +79,11 @@ public final class IrMissileControl {
             LOCKS.remove(player.getStringUUID());
             return;
         }
+        if(!LoadoutIntegration.wantsIrLock(player,vehicle)) {
+            LOCKS.remove(player.getStringUUID());
+            PacketDistributor.sendToPlayer(player,new RadarPayloads.IrState(false,0,""));
+            return;
+        }
         VehicleType type = vehicle.getVehicleType();
         if (type != VehicleType.AIRPLANE && type != VehicleType.HELICOPTER) {
             // riding something else: drop any leftover lock so the tone cannot stay on
@@ -116,6 +121,7 @@ public final class IrMissileControl {
         Entity best = null;
         double bestScore = Double.MAX_VALUE;
         for (Entity e : candidates) {
+            if(e==player || e.getRootVehicle()==vehicle) continue;
             if (isFriendly(player, e)) continue;
             Vec3 to = e.position().add(0.0, 1.0, 0.0).subtract(eye);
             double dist = to.length();
@@ -123,9 +129,15 @@ public final class IrMissileControl {
             if (to.normalize().dot(look) < coneCos) continue;
 
             // head-on targets present a much smaller heat signature
-            boolean headOn = e.getLookAngle().normalize().dot(to.normalize()) > 0.5;
+            boolean headOn = e.getLookAngle().normalize().dot(to.normalize()) < -0.5;
             double allowed = headOn ? SbwRadarConfig.IR_RANGE_FRONT.get() : SbwRadarConfig.IR_RANGE_REAR.get();
             if (dist > allowed) continue;
+            if(!net.minecraft.world.level.BlockGetter.traverseBlocks(eye,e.getBoundingBox().getCenter(),vehicle.level(),
+                    (world,pos)->world.hasChunkAt(pos) ? null : Boolean.FALSE,world->Boolean.TRUE)) continue;
+            var hit=vehicle.level().clip(new net.minecraft.world.level.ClipContext(eye,
+                    e.getBoundingBox().getCenter(),net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                    net.minecraft.world.level.ClipContext.Fluid.NONE,vehicle));
+            if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.MISS) continue;
 
             double score = dist;
             if (score < bestScore) {
@@ -153,6 +165,7 @@ public final class IrMissileControl {
         if (!(shooter instanceof Player player)) return;
         Entity ridden = player.getVehicle();
         if (!(ridden instanceof VehicleEntity vehicle) || vehicle.isWreck()) return;
+        if(LoadoutIntegration.handles(player,vehicle)) return;
 
         VehicleType type = vehicle.getVehicleType();
         if (type != VehicleType.AIRPLANE && type != VehicleType.HELICOPTER) return;
@@ -228,7 +241,11 @@ public final class IrMissileControl {
                         break;
                     }
                 }
-                if (mp.isDistracted()) continue;
+            }
+            if (missile instanceof MissileProjectile mp && mp.isDistracted()) {
+                if(missile.getPersistentData().contains("SBWRadarLoadoutIR"))
+                    missile.getPersistentData().getCompound("SBWRadarLoadoutIR").putBoolean("Decoyed",true);
+                continue;
             }
 
             // onboard seeker keeps tracking whatever it was pointed at
@@ -278,6 +295,8 @@ public final class IrMissileControl {
             if (missile instanceof MissileProjectile mp) {
                 mp.setDistracted(true);
             }
+            if(missile.getPersistentData().contains("SBWRadarLoadoutIR"))
+                missile.getPersistentData().getCompound("SBWRadarLoadoutIR").putBoolean("Decoyed",true);
             it.remove();
             defeated++;
         }
@@ -287,6 +306,35 @@ public final class IrMissileControl {
     /** True when this player currently has an IR lock (for HUD / diagnostics). */
     public static boolean hasLock(String playerUuid) {
         return LOCKS.containsKey(playerUuid);
+    }
+
+    public static Entity lockedTarget(VehicleEntity vehicle) {
+        if(!SbwRadarConfig.IR_ENABLE.get() || !(vehicle.getFirstPassenger() instanceof ServerPlayer p)
+                || vehicle.getSeatIndex(p)!=0 || vehicle.isWreck()) return null;
+        return findHeatTarget(p,vehicle);
+    }
+
+    /** Register the projectile already fired and paid for by loadout, without spawning another. */
+    public static void trackLoadout(net.minecraft.world.entity.projectile.Projectile shot,ServerPlayer owner,
+                                    VehicleEntity launcher,Entity target,String ammo) {
+        if(!(shot instanceof MissileProjectile mp)) return;
+        mp.setTargetUuid(target.getStringUUID());mp.setTargetVec(target.position());mp.setLost(false);
+        var n=new net.minecraft.nbt.CompoundTag();
+        n.putUUID("Source",launcher.getUUID());n.putUUID("Owner",owner.getUUID());n.putString("Ammo",ammo);
+        if(owner.getTeam()!=null) n.putString("OwnerTeam",owner.getTeam().getName());
+        shot.getPersistentData().put("SBWRadarLoadoutIR",n);
+        Guided g=new Guided(launcher.getId(),owner.getStringUUID());
+        g.flareChance=SbwRadarConfig.IR_FLARE_CHANCE.get();GUIDED.put(shot,g);
+    }
+
+    @SubscribeEvent
+    public static void onJoin(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent event) {
+        if(event.getLevel().isClientSide() || !(event.getEntity() instanceof MissileProjectile mp)) return;
+        var n=mp.getPersistentData().getCompound("SBWRadarLoadoutIR");
+        if(!n.hasUUID("Owner") || GUIDED.containsKey(mp)) return;
+        if(n.getBoolean("Decoyed")) mp.setDistracted(true);
+        Guided g=new Guided(-1,n.getUUID("Owner").toString());
+        g.flareChance=SbwRadarConfig.IR_FLARE_CHANCE.get();GUIDED.put(mp,g);
     }
 
     private IrMissileControl() {}

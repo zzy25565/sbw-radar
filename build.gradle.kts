@@ -19,6 +19,10 @@ repositories {
 }
 
 dependencies {
+    providers.gradleProperty("sharedClasspathFile").orNull?.let {
+        compileOnly(files(file(it).readLines().filter { path -> path.isNotBlank() }))
+    }
+    compileOnly(files("../sbw_loadout/build/libs/sbw-loadout-1.3.4.jar"))
     compileOnly(files("libs/minecraft-neoforge-compiled-21.1.249.jar"))
     compileOnly(files("libs/superbwarfare.jar"))
     compileOnly(files("libs/geckolib-neoforge-1.21.1-4.9.3.jar"))

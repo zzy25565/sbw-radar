@@ -98,6 +98,8 @@ public final class CounterMeasures {
         } else {
             defeated = RadarMissileControl.tryDecoy(level, pos, radius, chance, player.getStringUUID());
         }
+        if(kind==Kind.CHAFF)
+            defeated += LoadoutIntegration.tryDecoy(level,pos,radius,chance,player.getStringUUID());
 
         if (defeated > 0) {
             player.displayClientMessage(net.minecraft.network.chat.Component.literal(

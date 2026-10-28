@@ -57,6 +57,8 @@ public final class ClientRenderers {
         SyncedRadar best = null;
         double bestD = Double.MAX_VALUE;
         for (SyncedRadar r : ClientSyncedEntityHandler.getSyncedRadars(player.level())) {
+            if(player.getVehicle() instanceof VehicleEntity vehicle
+                    && r.getSourceId().equals("sbr_inject_"+vehicle.getId())) return r;
             double d = r.getPos().distanceToSqr(player.position());
             if (d < bestD) {
                 bestD = d;
