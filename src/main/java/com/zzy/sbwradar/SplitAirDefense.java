@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Split air defence: 雷达车指挥半径内的发射车开火.
+ * 分体式防空 / 自主发射: 雷达车锁定目标后，自己与半径内的发射车自动开火.
  *
  * <p>Many AA systems are two vehicles - a radar/command vehicle and a launcher vehicle.
  * SBW treats them as independent entities, so a launcher on its own has no lock. This
@@ -21,24 +21,28 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <ol>
  *   <li>a radar vehicle holds a TRK lock ({@link ServerRadarHandler#trackedTargetId});</li>
- *   <li>every {@code split.interval} ticks it looks for launcher vehicles inside
- *       {@code split.radius} (default 100 blocks) that carry missile-class ammo
- *       ({@link RadarMissileControl#missileGun});</li>
- *   <li>each eligible launcher is ordered to fire at the radar's lock through the same
- *       guided-missile path the player uses ({@link RadarMissileControl#launchFromLauncher});</li>
- *   <li>the launcher then goes on {@code split.cooldown}.</li>
+ *   <li>the radar vehicle fires its <b>own</b> missiles when it carries any
+ *       ({@code split.selfFire}, default on) - the driver only has to keep the lock,
+ *       no trigger pull needed;</li>
+ *   <li>every {@code split.interval} ticks it also orders launcher vehicles inside
+ *       {@code split.radius} (default 100 blocks) that carry missile-class ammo to fire;</li>
+ *   <li>each unit then goes on {@code split.cooldown}.</li>
  * </ol>
  *
- * <p>The missile is spawned at the <b>launcher</b> but keeps the radar vehicle as its
- * illumination/datalink owner, so channel limits and mid-course updates stay with the radar.
+ * <p>The missile is spawned at whoever launches it, but the radar vehicle stays the
+ * illumination/datalink owner, so channel limits and mid-course updates follow the radar.
  *
  * <p>Manned launchers are skipped by default ({@code split.onlyUnmanned}) so a player inside
- * keeps full manual control.
+ * keeps manual control. The radar vehicle itself is exempt: the driver is the one holding
+ * the lock, so auto-firing it is the expected behaviour.
  */
 public final class SplitAirDefense {
 
     /** launcher entity id -> server tick at which it may fire again */
     private static final Map<Integer, Integer> READY_AT = new ConcurrentHashMap<>();
+
+    /** how often the "why nothing fired" hint may be repeated (ticks) */
+    private static final int REPORT_INTERVAL = 40;
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -64,9 +68,11 @@ public final class SplitAirDefense {
 
     private static void tickLevel(ServerLevel level, int now) {
         double radius = SbwRadarConfig.SPLIT_AA_RADIUS.get();
+        double radiusSq = radius * radius;
         int cooldown = Math.max(1, SbwRadarConfig.SPLIT_AA_COOLDOWN.get());
         boolean onlyUnmanned = SbwRadarConfig.SPLIT_AA_ONLY_UNMANNED.get();
-        double radiusSq = radius * radius;
+        boolean selfFire = SbwRadarConfig.SPLIT_AA_SELF_FIRE.get();
+        boolean report = SbwRadarConfig.SPLIT_AA_REPORT.get();
 
         for (int radarId : ServerRadarHandler.trackedRadars()) {
             if (!(level.getEntity(radarId) instanceof VehicleEntity radar) || radar.isWreck()) continue;
@@ -77,24 +83,70 @@ public final class SplitAirDefense {
             if (target == null || !target.isAlive()) continue;
 
             int fired = 0;
+            boolean sawLauncher = false;
+            boolean sawLoaded = false;
+            boolean blockedManned = false;
+            boolean blockedCooldown = false;
+
+            // ── 1. 雷达车自身 ──
+            if (selfFire) {
+                Integer readyAt = READY_AT.get(radar.getId());
+                boolean ready = readyAt == null || now >= readyAt;
+                if (ready && RadarMissileControl.missileGun(radar) != null) {
+                    if (RadarMissileControl.launchFromLauncher(radar, radar, target)) {
+                        READY_AT.put(radar.getId(), now + cooldown);
+                        fired++;
+                    }
+                } else if (!ready) {
+                    blockedCooldown = true;
+                }
+            }
+
+            // ── 2. 半径内的发射车 ──
             for (VehicleEntity launcher : level.getEntitiesOfClass(
                     VehicleEntity.class, radar.getBoundingBox().inflate(radius))) {
                 if (launcher == radar || launcher.isWreck() || !launcher.isAlive()) continue;
                 if (launcher.distanceToSqr(radar) > radiusSq) continue;
-                if (onlyUnmanned && launcher.getFirstPassenger() != null) continue;
+                sawLauncher = true;
 
+                if (RadarMissileControl.missileGun(launcher) == null) continue;
+                sawLoaded = true;
+
+                if (onlyUnmanned && launcher.getFirstPassenger() != null) {
+                    blockedManned = true;
+                    continue;
+                }
                 Integer readyAt = READY_AT.get(launcher.getId());
-                if (readyAt != null && now < readyAt) continue;
-
+                if (readyAt != null && now < readyAt) {
+                    blockedCooldown = true;
+                    continue;
+                }
                 if (RadarMissileControl.launchFromLauncher(launcher, radar, target)) {
                     READY_AT.put(launcher.getId(), now + cooldown);
                     fired++;
                 }
             }
 
-            if (fired > 0 && radar.getFirstPassenger() instanceof ServerPlayer driver) {
-                driver.displayClientMessage(
-                        Component.literal("发射车 ×" + fired + " 已开火"), true);
+            if (!(radar.getFirstPassenger() instanceof ServerPlayer driver)) continue;
+
+            if (fired > 0) {
+                driver.displayClientMessage(Component.literal("自主发射 ×" + fired), true);
+            } else if (report && now % REPORT_INTERVAL == 0) {
+                String why;
+                if (!sawLauncher && !selfFire) {
+                    why = "半径 " + (int) radius + " 格内没有载具";
+                } else if (!sawLauncher && selfFire) {
+                    why = "本车无导弹，且半径内没有其它载具";
+                } else if (!sawLoaded) {
+                    why = "半径内载具都没装导弹";
+                } else if (blockedManned && onlyUnmanned) {
+                    why = "发射车有乘员（split.onlyUnmanned=true）";
+                } else if (blockedCooldown) {
+                    why = "发射单位冷却中";
+                } else {
+                    why = "没有可发射单位";
+                }
+                driver.displayClientMessage(Component.literal("锁定中，未开火：" + why), true);
             }
         }
     }

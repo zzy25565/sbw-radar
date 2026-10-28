@@ -28,7 +28,11 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 
 - **导弹从发射车出膛，但制导权归雷达车**——`Guided.radarVehicleId` 记的是雷达车，
   所以通道数上限、中段指令更新都还算在雷达车上，符合真实的数据链分工。
+- **雷达车自己也能打**（`split.selfFire=true`）：锁上就自动发射本车导弹，驾驶员不需要扣扳机；
+  `split.onlyUnmanned` 不管制雷达车本身——驾驶员正是持锁的人，自动开火才是预期行为。
 - **默认跳过有乘员的发射车**（`split.onlyUnmanned=true`），有人坐在里面时保留手动接管。
+- **打不出去会说原因**（`split.report=true`）：锁定中但没开火时，actionbar 每 2 秒提示一次，
+  区分「半径内没有载具 / 都没装导弹 / 发射车有乘员 / 冷却中」。
 - 只接管**雷达制导**弹药；红外弹仍走 `IrMissileControl`，被指挥的是"雷达弹"这个概念。
 - 雷达车驾驶员会收到 `发射车 ×N 已开火` 的 actionbar 提示。
 
@@ -48,6 +52,8 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 | `split.radius` | 雷达车指挥半径，默认 **100** 格 |
 | `split.interval` / `split.cooldown` | 搜索间隔 / 单台发射车冷却（tick） |
 | `split.onlyUnmanned` | 只指挥无人发射车（默认 true） |
+| `split.selfFire` | 雷达车自身也自动发射（默认 true） |
+| `split.report` | 锁定未开火时在 actionbar 说明原因（默认 true） |
 
 ## 编译
 

@@ -242,6 +242,15 @@ public final class SbwRadarConfig {
             .comment("Per-launcher cooldown after a remote launch (ticks)")
             .defineInRange("split.cooldown", 100, 10, 1200);
 
+    public static final ModConfigSpec.BooleanValue SPLIT_AA_SELF_FIRE = BUILDER
+            .comment("The radar vehicle also fires its own missiles while locked (ignores onlyUnmanned,",
+                    "because the driver is the one holding the lock)")
+            .define("split.selfFire", true);
+
+    public static final ModConfigSpec.BooleanValue SPLIT_AA_REPORT = BUILDER
+            .comment("Tell the radar driver why nothing fired (no launcher in range, no missile ammo, ...)")
+            .define("split.report", true);
+
     public static final ModConfigSpec.BooleanValue SPLIT_AA_ONLY_UNMANNED = BUILDER
             .comment("Only remote-fire launchers that have no passenger (leave manned ones under player control)")
             .define("split.onlyUnmanned", true);
