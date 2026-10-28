@@ -101,25 +101,47 @@ public final class RadarMissileControl {
         Entity target = level.getEntity(targetId);
         if (target == null || !target.isAlive()) return;
 
+        spawnGuided(level, vehicle, vehicle.getId(), player.getStringUUID(), player, target, spec,
+                radarMode == RadarMode.TWS ? targetId : -1, vehicle.getLookAngle());
+    }
+
+    /**
+     * Spawn a radar-guided missile and register it for steering.
+     *
+     * Shared by two callers:
+     *  - the player-triggered path (onShoot): the missile leaves the radar vehicle itself;
+     *  - split air defence (launchFromLauncher): a separate launcher vehicle fires, while the
+     *    radar vehicle still owns the illumination and the datalink channel.
+     *
+     * @param launchFrom       vehicle the missile leaves from
+     * @param radarVehicleId   vehicle whose radar illuminates the target (channel accounting)
+     * @param ownerUuid        shooter uuid, or empty when fired by a radar command
+     * @param owner            entity used as the projectile owner (may be the vehicle itself)
+     * @param assignedTargetId TWS track id, -1 = follow the radar TRK target
+     * @return true when a missile was actually spawned
+     */
+    static boolean spawnGuided(ServerLevel level, VehicleEntity launchFrom, int radarVehicleId,
+                               String ownerUuid, Entity owner, Entity target, AmmoSpecs.Spec spec,
+                               int assignedTargetId, Vec3 fallbackLook) {
         int guiding = 0;
         for (Guided g : GUIDED.values()) {
-            if (g.radarVehicleId == vehicle.getId()) guiding++;
+            if (g.radarVehicleId == radarVehicleId) guiding++;
         }
         int maxChannels = spec != null ? spec.maxPerRadar() : SbwRadarConfig.MISSILE_MAX_CONCURRENT.get();
-        if (guiding >= maxChannels) return;
+        if (guiding >= maxChannels) return false;
 
         String entityId = spec != null && spec.missileEntity() != null
                 ? spec.missileEntity() : SbwRadarConfig.MISSILE_ENTITY.get();
         ResourceLocation id = ResourceLocation.tryParse(entityId);
-        if (id == null) return;
+        if (id == null) return false;
         EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(id);
         Entity missile = type.create(level);
-        if (missile == null) return;
+        if (missile == null) return false;
 
-        Vec3 spawn = vehicle.position().add(0.0, 1.6, 0.0);
-        // illumination axis: radar (vehicle) -> target, tilted up a little
+        Vec3 spawn = launchFrom.position().add(0.0, 1.6, 0.0);
+        // illumination axis: launch point -> target, tilted up a little
         Vec3 axis = target.getEyePosition().subtract(spawn);
-        if (axis.lengthSqr() < 1.0E-4) axis = vehicle.getLookAngle();
+        if (axis.lengthSqr() < 1.0E-4) axis = fallbackLook;
         axis = axis.normalize();
         double climbUp = spec != null ? spec.climbUpDeg() : SbwRadarConfig.MISSILE_CLIMB_UP.get();
         double upRad = Math.toRadians(climbUp);
@@ -130,19 +152,51 @@ public final class RadarMissileControl {
         missile.moveTo(spawn.x + dir.x * 1.6, spawn.y + dir.y * 1.6, spawn.z + dir.z * 1.6, yaw, pitch);
         missile.setDeltaMovement(dir.scale(SbwRadarConfig.MISSILE_SPEED.get()));
 
-        if (missile instanceof ThrowableItemProjectile tip) tip.setOwner(player);
+        if (missile instanceof ThrowableItemProjectile tip) tip.setOwner(owner);
         if (missile instanceof MissileProjectile mp) {
             mp.setTargetUuid(target.getStringUUID());
             mp.setTargetVec(target.position());
             mp.setLost(false);
         }
 
-        if (!level.addFreshEntity(missile)) return;
-        Guided guided = new Guided(vehicle.getId(), player.getStringUUID(), target.position(), dir);
-        guided.assignedTargetId = radarMode == RadarMode.TWS ? targetId : -1;
+        if (!level.addFreshEntity(missile)) return false;
+        Guided guided = new Guided(radarVehicleId, ownerUuid, target.position(), dir);
+        guided.assignedTargetId = assignedTargetId;
         guided.climbTicks = spec != null ? spec.climbTicks() : SbwRadarConfig.MISSILE_CLIMB_TICKS.get();
         guided.seekerRange = spec != null ? spec.seekerRange() : SbwRadarConfig.MISSILE_SEEKER_RANGE.get();
         GUIDED.put(missile, guided);
+        return true;
+    }
+
+    /**
+     * Split air defence: a radar vehicle orders a nearby launcher vehicle to fire at its lock.
+     * The launcher must have missile-class ammo loaded; only radar-guided ammo is accepted here
+     * (IR rounds keep going through IrMissileControl).
+     */
+    public static boolean launchFromLauncher(VehicleEntity launcher, VehicleEntity radar, Entity target) {
+        if (!SbwRadarConfig.MISSILE_ENABLE.get()) return false;
+        if (launcher == null || radar == null || target == null) return false;
+        if (launcher.isWreck() || !launcher.isAlive() || !target.isAlive()) return false;
+        if (!(launcher.level() instanceof ServerLevel level)) return false;
+
+        GunData gun = missileGun(launcher);
+        if (gun == null) return false;
+        AmmoSpecs.Spec spec = AmmoSpecs.find(level.getServer(), ammoId(gun));
+        if (spec != null && spec.category() != AmmoSpecs.Category.RADAR) return false;
+
+        return spawnGuided(level, launcher, radar.getId(), "", launcher, target, spec, -1,
+                radar.getLookAngle());
+    }
+
+    /** First weapon on the vehicle whose loaded ammo counts as missile-class, or null. */
+    public static GunData missileGun(VehicleEntity vehicle) {
+        try {
+            for (GunData d : vehicle.getGunDataMap().values()) {
+                if (isMissileAmmoPublic(d)) return d;
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     /** Ammo id currently loaded in the weapon (projectile id, else item id). */

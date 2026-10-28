@@ -268,6 +268,15 @@ public final class ServerRadarHandler {
         return s == null ? null : s.mode;
     }
 
+    /** Vehicles currently holding a TRK lock (used by the split air-defence controller). */
+    public static java.util.Set<Integer> trackedRadars() {
+        java.util.Set<Integer> out = new java.util.HashSet<>();
+        STATES.forEach((id, s) -> {
+            if (s.mode == RadarMode.TRK && s.targetId >= 0) out.add(id);
+        });
+        return out;
+    }
+
     public static boolean isTracked(int vehicleId, int entityId) {
         VehicleState s = STATES.get(vehicleId);
         return s != null && s.lastHostiles.contains(entityId);

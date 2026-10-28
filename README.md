@@ -9,6 +9,30 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 - **导弹引导**：TWS 多目标跟踪与 STT 锁定，支持雷达/红外双通道
 - **弹药拦截**：小型防空车（通古斯卡、铠甲-S1）可拦截来袭弹丸，大型系统不适用
 - **近炸引信**：防空导弹无需直击，进入引信半径即起爆，重型/轻型半径分开配置
+- **分体式防空**：雷达车锁定目标后，可指挥 **100 格内**的发射车直接开火（1.7.0 新增）
+
+## 分体式防空（1.7.0）
+
+现实里的远程防空系统多是分成两辆车的：雷达/指挥车 + 发射车。SBW 把它们当作两个独立实体，
+所以发射车单独是"瞎子"——没有雷达就没有锁定。
+
+这个功能在服务端把两者接起来：
+
+1. 雷达车进入 **TRK** 模式并持有锁定（`ServerRadarHandler.trackedTargetId`）
+2. 每 `split.interval` tick，在 `split.radius`（默认 **100 格**）内找发射车
+3. 发射车必须已装 **导弹类弹药**（`RadarMissileControl.missileGun` 挑选第一个导弹武器）
+4. 通过玩家开火所用的**同一条制导链路**替它发射（`RadarMissileControl.launchFromLauncher`）
+5. 该发射车进入 `split.cooldown` 冷却
+
+几个设计取舍：
+
+- **导弹从发射车出膛，但制导权归雷达车**——`Guided.radarVehicleId` 记的是雷达车，
+  所以通道数上限、中段指令更新都还算在雷达车上，符合真实的数据链分工。
+- **默认跳过有乘员的发射车**（`split.onlyUnmanned=true`），有人坐在里面时保留手动接管。
+- 只接管**雷达制导**弹药；红外弹仍走 `IrMissileControl`，被指挥的是"雷达弹"这个概念。
+- 雷达车驾驶员会收到 `发射车 ×N 已开火` 的 actionbar 提示。
+
+生效前提：`missile.enable=true`（导弹引导总开关）且雷达车真的在 TRK 锁着目标。
 
 ## 配置
 
@@ -20,6 +44,10 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 | `interception.radius` / `perBurst` / `cooldown` | 拦截半径、单次目标数、冷却 tick |
 | `proximity.heavyMissiles` / `heavyRadius` | 重型防空导弹与引信半径 |
 | `proximity.lightMissiles` / `lightRadius` | 轻型防空导弹与引信半径 |
+| `split.enable` | 分体式防空总开关（默认 true） |
+| `split.radius` | 雷达车指挥半径，默认 **100** 格 |
+| `split.interval` / `split.cooldown` | 搜索间隔 / 单台发射车冷却（tick） |
+| `split.onlyUnmanned` | 只指挥无人发射车（默认 true） |
 
 ## 编译
 
@@ -31,28 +59,3 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 ```bash
 gradle jar            # 产物在 build/libs/
 ```
-
----
-
-## 第三方依赖与许可
-
-本项目是 [Superb Warfare](https://github.com/atsuishio/superbwarfare) 的附属模组，运行时依赖该模组。
-
-| 项 | 说明 |
-|---|---|
-| 上游模组 | Superb Warfare（Atsuishio、Roki27、Light_Quanta 及贡献者） |
-| 上游许可 | **GNU GPL v3.0**（见其发布 jar 内 `COPYING` / `COPYING.LESSER`） |
-| 本仓库内容 | 仅为附属功能的原创实现，通过上游公开 API 交互 |
-| 是否包含上游文件 | **否**。不含 Superb Warfare 的源码、资源或二进制 |
-
-因运行时链接 GPL-3.0 组件，本附属同样以 **GPL-3.0** 分发。若需其他许可安排，请自行确认合规性。
-
-本仓库**不包含**任何第三方游戏资源（War Thunder 模型与贴图等），也不包含构建所需的依赖 jar（`libs/` 已列入 `.gitignore`）。
-
-## 依赖关系
-
-| 方向 | 项目 | 说明 |
-|---|---|---|
-| 运行依赖 | Superb Warfare (GPL-3.0) | 必需 |
-| 被依赖 | [sbw-vls](https://github.com/zzy25565/sbw-vls) | 该载具包中的防空车（Tunguska / Pantsir / Buk）依赖本模组的雷达 HUD、TWS 制导、弹药拦截与近炸引信 |
-| 可选搭配 | [sbw-loadout](https://github.com/zzy25565/sbw-loadout) | 自定义挂载附属 1.2.0 起与本模组联动，提供雷达弹 |

@@ -224,6 +224,28 @@ public final class SbwRadarConfig {
                     "have a fixed alpha, so lower count is how you make it fainter)")
             .defineInRange("counter.chaffSmoke", 6, 0, 60);
 
+    // ── split air defence (radar vehicle commands a separate launcher) ──
+
+    public static final ModConfigSpec.BooleanValue SPLIT_AA_ENABLE = BUILDER
+            .comment("Split air defence: a radar vehicle orders nearby launcher vehicles to fire at its lock")
+            .define("split.enable", true);
+
+    public static final ModConfigSpec.DoubleValue SPLIT_AA_RADIUS = BUILDER
+            .comment("Max distance (blocks) between the radar vehicle and a launcher for remote fire")
+            .defineInRange("split.radius", 100.0, 8.0, 512.0);
+
+    public static final ModConfigSpec.IntValue SPLIT_AA_INTERVAL = BUILDER
+            .comment("How often the radar vehicle looks for launchers (ticks)")
+            .defineInRange("split.interval", 10, 1, 100);
+
+    public static final ModConfigSpec.IntValue SPLIT_AA_COOLDOWN = BUILDER
+            .comment("Per-launcher cooldown after a remote launch (ticks)")
+            .defineInRange("split.cooldown", 100, 10, 1200);
+
+    public static final ModConfigSpec.BooleanValue SPLIT_AA_ONLY_UNMANNED = BUILDER
+            .comment("Only remote-fire launchers that have no passenger (leave manned ones under player control)")
+            .define("split.onlyUnmanned", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private SbwRadarConfig() {}

@@ -29,6 +29,7 @@ public final class SbwRadarMod {
         ModLoadingContext.get().getActiveContainer().registerConfig(ModConfig.Type.CLIENT, SbwRadarClientConfig.SPEC);
         NeoForge.EVENT_BUS.register(ServerRadarHandler.class);
         NeoForge.EVENT_BUS.register(RadarMissileControl.class);
+        NeoForge.EVENT_BUS.register(SplitAirDefense.class);   // 分体式防空：雷达车指挥发射车
         NeoForge.EVENT_BUS.register(IrMissileControl.class);
         NeoForge.EVENT_BUS.register(AmmoInterceptor.class);
         NeoForge.EVENT_BUS.register(AaProximityFuze.class);
