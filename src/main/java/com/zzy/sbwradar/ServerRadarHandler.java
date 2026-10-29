@@ -124,7 +124,9 @@ public final class ServerRadarHandler {
             s.widthDeg = profile.sectorDeg();
             return s;
         });
-        if (state.widthDeg <= 0) state.widthDeg = profile.sectorDeg();
+        if (state.widthDeg <= 0) state.widthDeg = airborne
+                ? airborneSectors().get(airborneSectors().size() - 1)
+                : profile.sectorDeg();
         if (!profile.modes().contains(state.mode)) {
             state.mode = profile.modes().get(0);
         }
@@ -132,7 +134,10 @@ public final class ServerRadarHandler {
         RadarScanner.RadarConfig config = buildConfig(level, player, vehicle, profile, state, airborne);
         RadarScanner.INSTANCE.sendRadarConfig(config, level);
 
-        int interval = switch (state.mode) {
+        // 机载雷达：扫描角度越窄，刷新越快（间隔与宽度成正比）
+        // TRK 用的是 8° 窄波束，不该跟着扇区宽度变慢，仍走 profile 的 trkInterval
+        int interval = (airborne && state.mode != RadarMode.TRK)
+                ? airborneInterval(state.widthDeg) : switch (state.mode) {
             case SRC -> Math.max(1, profile.srcInterval());
             case TWS -> Math.max(1, profile.twsInterval());
             case TRK -> Math.max(1, profile.trkInterval());
@@ -236,6 +241,42 @@ public final class ServerRadarHandler {
         return bestId;
     }
 
+    /** Fixed airborne sectors, ascending. */
+    public static java.util.List<Double> airborneSectors() {
+        java.util.List<Double> out = new java.util.ArrayList<>();
+        for (String raw : SbwRadarConfig.AIRBORNE_SECTORS.get()) {
+            try {
+                out.add(Double.parseDouble(raw.trim()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (out.isEmpty()) out.add(120.0);
+        out.sort(Double::compare);
+        return out;
+    }
+
+    /** Narrower sector -> shorter interval, linear against the widest sector. */
+    public static int airborneInterval(double widthDeg) {
+        java.util.List<Double> sectors = airborneSectors();
+        double widest = sectors.get(sectors.size() - 1);
+        int base = Math.max(1, SbwRadarConfig.AIRBORNE_REFRESH_BASE.get());
+        double w = widthDeg > 0 ? Math.min(widthDeg, widest) : widest;
+        return Math.max(1, (int) Math.round(base * (w / widest)));
+    }
+
+    /** Ground-vehicle width steps from config. */
+    private static java.util.List<Double> widthSteps() {
+        java.util.List<Double> steps = new java.util.ArrayList<>();
+        for (String raw : SbwRadarConfig.WIDTH_STEPS.get()) {
+            try {
+                steps.add(Double.parseDouble(raw.trim()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (steps.isEmpty()) steps.add(60.0);
+        return steps;
+    }
+
     /** Bearing in SBW radar yaw space (0 = north / -Z). */
     public static double bearingTo(Vec3 from, Vec3 to) {
         double dx = to.x - from.x;
@@ -319,14 +360,9 @@ public final class ServerRadarHandler {
             s.widthDeg = profile.sectorDeg();
             return s;
         });
-        java.util.List<Double> steps = new java.util.ArrayList<>();
-        for (String raw : SbwRadarConfig.WIDTH_STEPS.get()) {
-            try {
-                steps.add(Double.parseDouble(raw.trim()));
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        if (steps.isEmpty()) steps.add(60.0);
+        boolean isAir = vehicle.getVehicleType() == VehicleType.AIRPLANE
+                || vehicle.getVehicleType() == VehicleType.HELICOPTER;
+        java.util.List<Double> steps = isAir ? airborneSectors() : widthSteps();
         double cur = state.widthDeg > 0 ? state.widthDeg : steps.get(0);
         int idx = 0;
         double best = Double.MAX_VALUE;
@@ -339,8 +375,10 @@ public final class ServerRadarHandler {
         }
         state.widthDeg = steps.get((idx + 1) % steps.size());
         state.syncCooldown = 0;
+        String suffix = isAir
+                ? "（" + airborneInterval(state.widthDeg) + " tick 刷新）" : "";
         player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                "雷达扫描宽度: " + (int) Math.round(state.widthDeg) + "°"), true);
+                "雷达扫描宽度: " + (int) Math.round(state.widthDeg) + "°" + suffix), true);
     }
 
     public static void cycleTarget(Player player, int vehicleId) {

@@ -97,6 +97,16 @@ public final class SbwRadarConfig {
             .comment("Airborne radar search sector in degrees, centred on the nose (forward only)")
             .defineInRange("airborne.sector", 60.0, 20.0, 180.0);
 
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> AIRBORNE_SECTORS = BUILDER
+            .comment("Fixed scan sectors (degrees) for the airborne radar, cycled with the width key.",
+                    "Narrower sector = faster refresh (see airborne.refreshBase)")
+            .defineList("airborne.sectors", java.util.List.of("30", "60", "120"),
+                    o -> o instanceof String);
+
+    public static final ModConfigSpec.IntValue AIRBORNE_REFRESH_BASE = BUILDER
+            .comment("Scan interval (ticks) at the widest sector; narrower sectors scale down proportionally")
+            .defineInRange("airborne.refreshBase", 10, 1, 100);
+
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> WIDTH_STEPS = BUILDER
             .comment("Selectable radar scan widths in degrees (cycled with the width key)")
             .defineList("radar.widthSteps", java.util.List.of("30", "60", "120"), o -> o instanceof String);
