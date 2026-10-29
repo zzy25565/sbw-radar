@@ -25,6 +25,10 @@ public final class RadarNetwork {
                 (payload, context) -> context.enqueueWork(() ->
                         ServerRadarHandler.cycleWidth(context.player(), payload.vehicleId())));
 
+        registrar.playToServer(RadarPayloads.CycleVertical.TYPE, RadarPayloads.CycleVertical.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        ServerRadarHandler.cycleVertical(context.player(), payload.vehicleId())));
+
         registrar.playToServer(RadarPayloads.Dispense.TYPE, RadarPayloads.Dispense.CODEC,
                 (payload, context) -> context.enqueueWork(() -> CounterMeasures.dispense(
                         context.player(),

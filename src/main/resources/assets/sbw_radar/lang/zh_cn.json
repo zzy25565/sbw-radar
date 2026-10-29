@@ -13,5 +13,6 @@
   "key.sbw_radar.cycle_target": "切换锁定目标",
   "key.sbw_radar.cycle_width": "切换扫描宽度",
   "key.sbw_radar.flare": "投放热诱弹",
-  "key.sbw_radar.chaff": "投放箔条"
+  "key.sbw_radar.chaff": "投放箔条",
+  "key.sbw_radar.cycle_vertical": "切换雷达竖向范围"
 }

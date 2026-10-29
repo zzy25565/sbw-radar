@@ -41,6 +41,7 @@ public final class ServerRadarHandler {
     private static final class VehicleState {
         RadarMode mode;
         double widthDeg = -1;
+        double verticalDeg = -1;
         int targetId = -1;
         double phase;
         List<Integer> lastHostiles = new ArrayList<>();
@@ -144,7 +145,7 @@ public final class ServerRadarHandler {
         };
         if (level.getServer().getTickCount() % interval == 0) {
             RadarScanner.ScanResult result = RadarScanner.INSTANCE.scan(level, config);
-            result = applyVerticalLimit(level, vehicle, result);
+            result = applyVerticalLimit(level, vehicle, state, result);
             result.sendToClients(player, level, SbwRadarConfig.SHARE_WITH_TEAMMATES.get());
             state.lastHostiles = new ArrayList<>(result.getHostileIds());
         }
@@ -250,9 +251,11 @@ public final class ServerRadarHandler {
      * equivalent to "above/below the horizon by at most verticalSweep degrees".
      */
     private static RadarScanner.ScanResult applyVerticalLimit(ServerLevel level, VehicleEntity vehicle,
+                                                              VehicleState state,
                                                               RadarScanner.ScanResult result) {
-        double limit = SbwRadarConfig.VERTICAL_SWEEP.get();
-        if (limit >= 45.0 - 1e-9) limit = 45.0;          // config already caps at 45
+        double ceiling = SbwRadarConfig.VERTICAL_SWEEP_MAX.get();
+        double wanted = state.verticalDeg > 0 ? state.verticalDeg : SbwRadarConfig.VERTICAL_SWEEP.get();
+        double limit = Math.max(1.0, Math.min(wanted, ceiling));
         Vec3 center = vehicle.position().add(0.0, 1.5, 0.0);
         double boresight = -vehicle.getXRot();            // MC: xRot<0 = nose up
 
@@ -278,6 +281,47 @@ public final class ServerRadarHandler {
             if (Math.abs(elevation - boresight) <= limit) kept.add(id);
         }
         return kept;
+    }
+
+    /** Vertical scan steps from config, ascending and capped by the configured ceiling. */
+    public static java.util.List<Double> verticalSteps() {
+        double ceiling = SbwRadarConfig.VERTICAL_SWEEP_MAX.get();
+        java.util.List<Double> out = new java.util.ArrayList<>();
+        for (String raw : SbwRadarConfig.VERTICAL_STEPS.get()) {
+            try {
+                double v = Double.parseDouble(raw.trim());
+                if (v > 0 && v <= ceiling) out.add(v);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (out.isEmpty()) out.add(Math.min(45.0, ceiling));
+        out.sort(Double::compare);
+        return out;
+    }
+
+    /** Cycle the vertical scan range (in-game key). */
+    public static void cycleVertical(Player player, int vehicleId) {
+        Entity ridden = player.getVehicle();
+        if (!(ridden instanceof VehicleEntity vehicle) || vehicle.getId() != vehicleId) return;
+        if (!(player.level() instanceof ServerLevel level)) return;
+        VehicleState state = STATES.computeIfAbsent(vehicleId, id -> {
+            VehicleState s = new VehicleState();
+            s.mode = RadarMode.SRC;
+            return s;
+        });
+        java.util.List<Double> steps = verticalSteps();
+        double cur = state.verticalDeg > 0 ? state.verticalDeg : SbwRadarConfig.VERTICAL_SWEEP.get();
+        double next = steps.get(0);
+        for (double s : steps) {
+            if (s > cur + 1e-6) {
+                next = s;
+                break;
+            }
+        }
+        state.verticalDeg = next;
+        state.syncCooldown = 0;
+        player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                "雷达竖向范围: ±" + (int) Math.round(next) + "°"), true);
     }
 
     /** Fixed airborne sectors, ascending. */

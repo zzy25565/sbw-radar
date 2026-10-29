@@ -67,6 +67,19 @@ public final class RadarPayloads {
         }
     }
 
+    /** Client -> server: cycle the vertical scan range. */
+    public record CycleVertical(int vehicleId) implements CustomPacketPayload {
+        public static final Type<CycleVertical> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(SbwRadarMod.MODID, "cycle_vertical"));
+        public static final StreamCodec<FriendlyByteBuf, CycleVertical> CODEC = StreamCodec.of(
+                (buf, p) -> buf.writeVarInt(p.vehicleId()),
+                buf -> new CycleVertical(buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     /** Client -> server: dispense a countermeasure (0 = flare, 1 = chaff). */
     public record Dispense(int kind) implements CustomPacketPayload {
         public static final Type<Dispense> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(SbwRadarMod.MODID, "dispense"));

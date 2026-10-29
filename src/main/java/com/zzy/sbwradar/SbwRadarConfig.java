@@ -27,10 +27,20 @@ public final class SbwRadarConfig {
             .defineInRange("radar.maxTargetHeight", 400.0, 0.0, 2032.0);
 
     public static final ModConfigSpec.DoubleValue VERTICAL_SWEEP = BUILDER
-            .comment("Vertical scan half-range in degrees, measured from the radar boresight.",
-                    "Allowed 5..45 (45 is the widest setting). Targets outside this cone are not reported,",
-                    "so a target straight overhead (90 deg) stays invisible at any setting.")
-            .defineInRange("radar.verticalSweep", 45.0, 5.0, 45.0);
+            .comment("Default vertical scan half-range in degrees, measured from the radar boresight.",
+                    "Runtime value is clamped to radar.verticalSweepMax; players cycle it in game with the",
+                    "vertical-range key. 89 = essentially no vertical blind spot.")
+            .defineInRange("radar.verticalSweep", 45.0, 5.0, 89.0);
+
+    public static final ModConfigSpec.DoubleValue VERTICAL_SWEEP_MAX = BUILDER
+            .comment("Upper limit for the vertical scan range (degrees). Raise this to allow wider cones;",
+                    "89 lets the radar see almost straight up.")
+            .defineInRange("radar.verticalSweepMax", 45.0, 5.0, 89.0);
+
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> VERTICAL_STEPS = BUILDER
+            .comment("Vertical scan steps (degrees) cycled by the vertical-range key, ascending")
+            .defineList("radar.verticalSweepSteps", java.util.List.of("10", "20", "30", "45"),
+                    o -> o instanceof String);
 
     public static final ModConfigSpec.IntValue SCAN_INTERVAL = BUILDER
             .comment("Scan every N ticks")

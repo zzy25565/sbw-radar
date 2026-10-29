@@ -6,5 +6,6 @@
   "key.sbw_radar.cycle_target": "Cycle Locked Target",
   "key.sbw_radar.cycle_width": "Cycle Scan Width",
   "key.sbw_radar.flare": "Dispense Flare",
-  "key.sbw_radar.chaff": "Dispense Chaff"
+  "key.sbw_radar.chaff": "Dispense Chaff",
+  "key.sbw_radar.cycle_vertical": "Cycle radar vertical range"
 }
