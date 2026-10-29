@@ -26,6 +26,12 @@ public final class SbwRadarConfig {
             .comment("Maximum target height (absolute Y)")
             .defineInRange("radar.maxTargetHeight", 400.0, 0.0, 2032.0);
 
+    public static final ModConfigSpec.DoubleValue VERTICAL_SWEEP = BUILDER
+            .comment("Vertical scan half-range in degrees, measured from the radar boresight.",
+                    "Allowed 5..45 (45 is the widest setting). Targets outside this cone are not reported,",
+                    "so a target straight overhead (90 deg) stays invisible at any setting.")
+            .defineInRange("radar.verticalSweep", 45.0, 5.0, 45.0);
+
     public static final ModConfigSpec.IntValue SCAN_INTERVAL = BUILDER
             .comment("Scan every N ticks")
             .defineInRange("radar.scanInterval", 5, 1, 100);

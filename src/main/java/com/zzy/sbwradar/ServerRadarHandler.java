@@ -144,6 +144,7 @@ public final class ServerRadarHandler {
         };
         if (level.getServer().getTickCount() % interval == 0) {
             RadarScanner.ScanResult result = RadarScanner.INSTANCE.scan(level, config);
+            result = applyVerticalLimit(level, vehicle, result);
             result.sendToClients(player, level, SbwRadarConfig.SHARE_WITH_TEAMMATES.get());
             state.lastHostiles = new ArrayList<>(result.getHostileIds());
         }
@@ -239,6 +240,44 @@ public final class ServerRadarHandler {
             }
         }
         return bestId;
+    }
+
+    /**
+     * Drop contacts outside the vertical scan cone.
+     *
+     * Elevation is measured from the radar boresight (vehicle pitch), so an aircraft whose nose
+     * is pitched up keeps its cone pointed up. Ground vehicles sit near 0 deg, which makes this
+     * equivalent to "above/below the horizon by at most verticalSweep degrees".
+     */
+    private static RadarScanner.ScanResult applyVerticalLimit(ServerLevel level, VehicleEntity vehicle,
+                                                              RadarScanner.ScanResult result) {
+        double limit = SbwRadarConfig.VERTICAL_SWEEP.get();
+        if (limit >= 45.0 - 1e-9) limit = 45.0;          // config already caps at 45
+        Vec3 center = vehicle.position().add(0.0, 1.5, 0.0);
+        double boresight = -vehicle.getXRot();            // MC: xRot<0 = nose up
+
+        java.util.List<Integer> hostiles = filterByElevation(level, center, boresight, limit,
+                result.getHostileIds());
+        java.util.List<Integer> neutrals = filterByElevation(level, center, boresight, limit,
+                result.getNeutralIds());
+        if (hostiles == result.getHostileIds() && neutrals == result.getNeutralIds()) return result;
+        return new RadarScanner.ScanResult(result.getDim(), hostiles, neutrals, result.getPlayerInfos());
+    }
+
+    private static java.util.List<Integer> filterByElevation(ServerLevel level, Vec3 center,
+                                                             double boresight, double limit,
+                                                             java.util.List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) return ids;
+        java.util.List<Integer> kept = new ArrayList<>(ids.size());
+        for (int id : ids) {
+            Entity e = level.getEntity(id);
+            if (e == null) continue;
+            Vec3 d = e.position().subtract(center);
+            double horizontal = Math.sqrt(d.x * d.x + d.z * d.z);
+            double elevation = Math.toDegrees(Math.atan2(d.y, horizontal));
+            if (Math.abs(elevation - boresight) <= limit) kept.add(id);
+        }
+        return kept;
     }
 
     /** Fixed airborne sectors, ascending. */
