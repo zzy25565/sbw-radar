@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-29",
+  "version": "1.3.4",
+  "radar_version": "1.11.1",
+  "network_protocol": 5,
+  "radar_without_loadout_client_boot": true,
+  "gametests_each_sbw_version": 74,
+  "standalone_gametests_each_sbw_version": 65,
+  "client_checks_each_sbw_version": 14,
+  "air_to_air_count": 10,
+  "air_to_air": [
+    "aim54a",
+    "aim54c",
+    "pl12",
+    "pl12a",
+    "r40rd",
+    "r40td",
+    "r73",
+    "r73l",
+    "r77",
+    "r77_1"
+  ],
+  "air_to_air_blast_multiplier": 0.5,
+  "impact_and_radius_unchanged": true,
+  "other_ammo_unchanged": 19,
+  "model_and_other_data_resources_unchanged": 111,
+  "preserved_controllers": [
+    "guidance/CruiseGuidance",
+    "guidance/CruiseMissileEntity",
+    "guidance/SeekerController",
+    "guidance/RadarMissileEntity",
+    "guidance/BombRelease",
+    "client/PodThermalVision",
+    "mixin/PodThermalMixin"
+  ],
+  "development_classes_excluded": true,
+  "jars": [
+    {
+      "file": "sbw-loadout-1.3.4.jar",
+      "bytes": 91289782,
+      "sha256": "c019fd45f679b5da529fbc5f8c531b170fea4fac9122209b2b7752146d4235e9"
+    },
+    {
+      "file": "sbw_radar-1.11.1.jar",
+      "bytes": 133872,
+      "sha256": "57ff1e32546be1ba9d5373ff09f4361fb07b1f62884dc214469d0bc057828edd"
+    }
+  ]
+}

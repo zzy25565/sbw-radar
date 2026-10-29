@@ -68,7 +68,13 @@ public final class CounterMeasures {
                         net.minecraft.network.chat.Component.literal("没有热诱弹了"), true);
                 return;
             }
-            vehicle.releaseDecoy();
+            int before = vehicle.getDecoyCount();
+            boolean held = vehicle.decoyInputDown();
+            vehicle.setDecoyInputDown(true);
+            try { vehicle.releaseDecoy(); }
+            finally { vehicle.setDecoyInputDown(held); }
+            // SBW requires the input flag; an empty/reloading pool must not grant a free decoy roll.
+            if (vehicle.getDecoyCount() >= before) return;
         } else {
             if (!consumeFromVehicle(vehicle, CounterItems.CHAFF.get(), player)) {
                 player.displayClientMessage(

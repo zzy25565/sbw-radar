@@ -1,10 +1,10 @@
 # SBW Radar
 
-当前版本 **1.7.2**（2026-10-29）。[下载正式版](https://github.com/zzy25565/sbw-radar/releases/tag/v1.7.2)；空空导弹联动配套 [sbw-loadout 1.3.4](https://github.com/zzy25565/sbw-loadout/releases/tag/v1.3.4)。客户端和服务端同时更新两个 JAR，移出旧版。
+当前版本 **1.11.1**（2026-10-29）。[下载正式版](https://github.com/zzy25565/sbw-radar/releases/tag/v1.11.1-loadout)；空空导弹联动配套 [sbw-loadout 1.3.4](https://github.com/zzy25565/sbw-loadout/releases/tag/v1.3.4)。客户端和服务端同时更新两个 JAR，移出旧版。
 
 本次仅接入挂载模组的空空导弹：AIM-54A/C、PL-12/12A、R-40RD/TD、R-73/73L、R-77/77-1。雷达弹共用 TRK / TWS、照射通道与箔条；红外弹共用热目标锁定与热诱弹，直接登记已发射的挂载弹体，不另外生成导弹。Kh-38MT 空地弹和航弹不接入空空红外接口；既有 9M336 雷达联动保留。
 
-基于 GitHub 1.7.1 合并，保留分体式防空、自主发射及原因提示；挂载飞机/直升机继续由驾驶员手动发射，不进入地面防空自主流程，也不允许通过原生远程发射绕过挂载库存。自主地面弹体缺少玩家 UUID 时不会在末段搜索中抛异常。
+基于 GitHub 1.11.0 合并，保留分体式防空、自主发射及原因提示；挂载飞机/直升机继续由驾驶员手动发射，不进入地面防空自主流程，也不允许通过原生远程发射绕过挂载库存。自主地面弹体缺少玩家 UUID 时不会在末段搜索中抛异常。
 
 空空弹爆炸伤害由配套挂载 1.3.4 降低为旧值的 50%，直击和爆炸半径保留。联动近炸调用弹体自身 SBW 爆炸，避免绕过弹药伤害。自机、乘员、友军及遮挡目标不触发联动近炸；箔条/热诱后脱锁状态保留至相应弹体存档。
 
@@ -128,7 +128,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 
 ## 配置
 
-`config/sbw_radar-common.toml`
+世界目录的 `serverconfig/sbw_radar-server.toml`（开发运行环境可能位于 `run/config/`）。
 
 | 键 | 说明 |
 |---|---|
@@ -158,7 +158,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 gradle jar            # 产物在 build/libs/
 ```
 
-编译 1.7.2 时还需相邻 `../sbw_loadout/build/libs/sbw-loadout-1.3.4.jar` 作为可选接口的 compileOnly 依赖，发布 JAR 不包含挂载代码。若有配套挂载的 NeoForge 开发环境，可复用其已解析依赖，省去准备以上离线依赖：
+编译 1.11.1 时还需相邻 `../sbw_loadout/build/libs/sbw-loadout-1.3.4.jar` 作为可选接口的 compileOnly 依赖，发布 JAR 不包含挂载代码。若有配套挂载的 NeoForge 开发环境，可复用其已解析依赖，省去准备以上离线依赖：
 
 ```powershell
 # 在 sbw_loadout 目录，JDK 21
@@ -167,5 +167,5 @@ gradle jar            # 产物在 build/libs/
 .\gradlew.bat -Pgametest -PradarCompat runGameTestServer
 ```
 
-两个模组均可独立运行；同装时最低配套版本为挂载 1.3.4 / 雷达 1.7.2。生产构建完毕应在挂载目录执行不带 gametest、radarCompat 或 smoke 参数的 `clean build`，排除开发夹具。
+两个模组均可独立运行；同装时最低配套版本为挂载 1.3.4 / 雷达 1.11.1。生产构建完毕应在挂载目录执行不带 gametest、radarCompat 或 smoke 参数的 `clean build`，排除开发夹具。
 
