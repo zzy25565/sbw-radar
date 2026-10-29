@@ -76,6 +76,8 @@ public final class SplitAirDefense {
 
         for (int radarId : ServerRadarHandler.trackedRadars()) {
             if (!(level.getEntity(radarId) instanceof VehicleEntity radar) || radar.isWreck()) continue;
+            // Custom aircraft loadouts keep manual launch, inventory and their own cooldown.
+            if (LoadoutIntegration.ownsVehicle(radar)) continue;
 
             int targetId = ServerRadarHandler.trackedTargetId(radarId);
             if (targetId < 0) continue;
@@ -106,6 +108,7 @@ public final class SplitAirDefense {
             for (VehicleEntity launcher : level.getEntitiesOfClass(
                     VehicleEntity.class, radar.getBoundingBox().inflate(radius))) {
                 if (launcher == radar || launcher.isWreck() || !launcher.isAlive()) continue;
+                if (LoadoutIntegration.ownsVehicle(launcher)) continue;
                 if (launcher.distanceToSqr(radar) > radiusSq) continue;
                 sawLauncher = true;
 

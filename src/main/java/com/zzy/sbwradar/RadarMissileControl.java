@@ -124,11 +124,11 @@ public final class RadarMissileControl {
     static boolean spawnGuided(ServerLevel level, VehicleEntity launchFrom, int radarVehicleId,
                                String ownerUuid, Entity owner, Entity target, AmmoSpecs.Spec spec,
                                int assignedTargetId, Vec3 fallbackLook) {
-        int guiding = 0;
-        for (Guided g : GUIDED.values()) {
-            if (g.radarVehicleId == radarVehicleId) guiding++;
-        }
-        int maxChannels = spec != null ? spec.maxPerRadar() : SbwRadarConfig.MISSILE_MAX_CONCURRENT.get();
+        int guiding = ownActiveFor(radarVehicleId);
+        if(level.getEntity(radarVehicleId) instanceof VehicleEntity radar)
+            guiding += LoadoutIntegration.activeFor(radar);
+        int maxChannels = Math.min(spec != null ? spec.maxPerRadar() : SbwRadarConfig.MISSILE_MAX_CONCURRENT.get(),
+                SbwRadarConfig.MISSILE_MAX_CONCURRENT.get());
         if (guiding >= maxChannels) return false;
 
         String entityId = spec != null && spec.missileEntity() != null
@@ -177,6 +177,7 @@ public final class RadarMissileControl {
     public static boolean launchFromLauncher(VehicleEntity launcher, VehicleEntity radar, Entity target) {
         if (!SbwRadarConfig.MISSILE_ENABLE.get()) return false;
         if (launcher == null || radar == null || target == null) return false;
+        if (LoadoutIntegration.ownsVehicle(launcher) || LoadoutIntegration.ownsVehicle(radar)) return false;
         if (launcher.isWreck() || !launcher.isAlive() || !target.isAlive()) return false;
         if (!(launcher.level() instanceof ServerLevel level)) return false;
 
@@ -185,7 +186,8 @@ public final class RadarMissileControl {
         AmmoSpecs.Spec spec = AmmoSpecs.find(level.getServer(), ammoId(gun));
         if (spec != null && spec.category() != AmmoSpecs.Category.RADAR) return false;
 
-        return spawnGuided(level, launcher, radar.getId(), "", launcher, target, spec, -1,
+        String ownerUuid = radar.getFirstPassenger() instanceof Player driver ? driver.getStringUUID() : "";
+        return spawnGuided(level, launcher, radar.getId(), ownerUuid, launcher, target, spec, -1,
                 radar.getLookAngle());
     }
 
@@ -449,8 +451,11 @@ public final class RadarMissileControl {
         if (candidate.getId() == g.radarVehicleId) return true;
 
         if (!(missile.level() instanceof ServerLevel level)) return false;
-        Player owner = level.getServer().getPlayerList()
-                .getPlayer(java.util.UUID.fromString(g.ownerUuid));
+        Player owner = null;
+        if(!g.ownerUuid.isBlank()) {
+            try {owner=level.getServer().getPlayerList().getPlayer(java.util.UUID.fromString(g.ownerUuid));}
+            catch(IllegalArgumentException ignored) { /* unmanned/legacy autonomous shots have no player UUID */ }
+        }
         PlayerTeam ownerTeam = owner != null ? owner.getTeam() : null;
         if (ownerTeam == null) return false;
 

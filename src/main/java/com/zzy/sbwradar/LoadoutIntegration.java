@@ -20,6 +20,9 @@ public final class LoadoutIntegration {
     public static boolean handles(Player player, VehicleEntity vehicle) {
         return installed && WithLoadout.handles(player,vehicle);
     }
+    public static boolean ownsVehicle(VehicleEntity vehicle) {
+        return installed && WithLoadout.ownsVehicle(vehicle);
+    }
     public static boolean wantsIrLock(Player player, VehicleEntity vehicle) {
         return !handles(player,vehicle) || WithLoadout.wantsIrLock(vehicle);
     }
@@ -32,6 +35,7 @@ public final class LoadoutIntegration {
     }
 
     private static final class WithLoadout {
+        static boolean ownsVehicle(VehicleEntity v) { return cn.zzy.loadout.LoadoutService.supported(v); }
         static boolean handles(Player p, VehicleEntity v) {
             return p instanceof ServerPlayer sp && cn.zzy.loadout.LoadoutService.pilot(sp,v)
                     && cn.zzy.loadout.LoadoutService.supported(v);
