@@ -7,13 +7,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ClientRadarState {
 
     public record State(String mode, int targetId, String targetName, int trackedCount, int widthDeg,
-                        int guidedCount) {}
+                        int guidedCount, int chaffCount) {}
 
     private static final Map<Integer, State> STATES = new ConcurrentHashMap<>();
 
     public static void set(RadarPayloads.StateSync p) {
         STATES.put(p.vehicleId(), new State(p.mode(), p.targetId(), p.targetName(), p.trackedCount(),
-                p.widthDeg(), p.guidedCount()));
+                p.widthDeg(), p.guidedCount(), p.chaffCount()));
     }
 
     public static State get(int vehicleId) {

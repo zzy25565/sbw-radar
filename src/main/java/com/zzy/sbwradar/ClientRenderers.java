@@ -3,6 +3,7 @@ package com.zzy.sbwradar;
 import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler;
 import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler.ClientSyncedEntity;
 import com.atsuishio.superbwarfare.client.ClientSyncedEntityHandler.SyncedRadar;
+import com.atsuishio.superbwarfare.data.vehicle.subdata.VehicleType;
 import com.atsuishio.superbwarfare.entity.vehicle.base.VehicleEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -102,6 +103,7 @@ public final class ClientRenderers {
         int r = SbwRadarClientConfig.HUD_SIZE.get();
         int cx = 24 + r;
         int cy = g.guiHeight() - 24 - r;
+        drawCountermeasureLine(g, font, player, cx, cy + r + 14);
 
         // background disc (scanline fill)
         for (int dy = -r; dy <= r; dy++) {
@@ -216,6 +218,25 @@ public final class ClientRenderers {
     }
 
     /** Three small fields above the scope; the wedge and blips do the rest. */
+    /**
+     * 干扰弹两行：热诱弹贴在原生 UI 文案之后（数量取自 SBW 的 DECOY_COUNT），
+     * 箔条是本附属独立的弹种，数量由 StateSync 带下来。
+     */
+    private static void drawCountermeasureLine(GuiGraphics g, Font font, Player player, int x, int y) {
+        if (!(player.getVehicle() instanceof VehicleEntity vehicle)) return;
+        var type = vehicle.getVehicleType();
+        if (type != VehicleType.AIRPLANE && type != VehicleType.HELICOPTER) return;
+
+        int flare = vehicle.getDecoyCount();
+        String flareText = flare > 0 ? ("热诱弹 " + flare) : "热诱弹 无";
+        g.drawString(font, flareText, x, y, flare > 0 ? 0xFFFFD27F : 0xFF8A8A8A);
+
+        int chaff = ClientRadarState.get(vehicle.getId()) instanceof ClientRadarState.State st
+                ? st.chaffCount() : 0;
+        String chaffText = chaff > 0 ? ("箔条 " + chaff) : "箔条 无";
+        g.drawString(font, chaffText, x, y + 10, chaff > 0 ? 0xFFBFD8FF : 0xFF8A8A8A);
+    }
+
     private static void drawHeader(GuiGraphics g, Font font, int cx, int cy, int r,
                                    SyncedRadar radar, ClientRadarState.State st) {
         String mode = switch (st.mode()) {

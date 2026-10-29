@@ -1,6 +1,5 @@
 package com.zzy.sbwradar;
 
-import com.atsuishio.superbwarfare.entity.projectile.FlareDecoyEntity;
 import com.atsuishio.superbwarfare.entity.vehicle.base.VehicleEntity;
 import com.atsuishio.superbwarfare.data.vehicle.subdata.VehicleType;
 import net.minecraft.core.particles.ParticleTypes;
@@ -60,25 +59,22 @@ public final class CounterMeasures {
         if (type != VehicleType.AIRPLANE && type != VehicleType.HELICOPTER) return;
         if (!(player.level() instanceof ServerLevel level)) return;
 
-        Item needed = kind == Kind.FLARE ? CounterItems.FLARE.get() : CounterItems.CHAFF.get();
-        if (!consume(player, needed)) {
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.literal(
-                            kind == Kind.FLARE ? "没有热诱弹了" : "没有箔条了"), true);
-            return;
-        }
-
         Vec3 pos = vehicle.position();
         if (kind == Kind.FLARE) {
-            // real decoy entity: gives SBW's own visuals/sound and can also bait native missiles
-            FlareDecoyEntity decoy = new FlareDecoyEntity(level);
-            decoy.moveTo(pos.x, pos.y + 0.5, pos.z, RNG.nextFloat() * 360.0F, 0.0F);
-            decoy.setDeltaMovement(vehicle.getDeltaMovement().scale(0.4).add(
-                    (RNG.nextDouble() - 0.5) * 0.3, -0.15, (RNG.nextDouble() - 0.5) * 0.3));
-            level.addFreshEntity(decoy);
-            level.playSound(null, pos.x, pos.y, pos.z, SoundEvents.FIREWORK_ROCKET_BLAST,
-                    SoundSource.PLAYERS, 0.6F, 1.6F);
+            // 热诱弹走 SBW 自带的载具诱饵池：发射源、冷却、数量都由它管，
+            // 弹药就是储物空间里的 superbwarfare:flying_flare_ammo
+            if (!vehicle.hasDecoy()) {
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.literal("没有热诱弹了"), true);
+                return;
+            }
+            vehicle.releaseDecoy();
         } else {
+            if (!consumeFromVehicle(vehicle, CounterItems.CHAFF.get(), player)) {
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.literal("没有箔条了"), true);
+                return;
+            }
             int smoke = SbwRadarConfig.COUNTER_CHAFF_SMOKE.get();
             if (smoke > 0) {
                 // few particles + tiny spread: vanilla particles cannot be made translucent,
@@ -109,12 +105,49 @@ public final class CounterMeasures {
         }
     }
 
-    private static boolean consume(Player player, Item item) {
-        var inv = player.getInventory();
-        for (int i = 0; i < inv.getContainerSize(); i++) {
-            var stack = inv.getItem(i);
-            if (!stack.isEmpty() && stack.is(item)) {
-                stack.shrink(1);
+    /** 箔条数量：以载具储物空间为准（找不到容器时回落到玩家背包）。 */
+    public static int chaffCount(VehicleEntity vehicle) {
+        return countIn(vehicle, CounterItems.CHAFF.get());
+    }
+
+    private static int countIn(VehicleEntity vehicle, Item item) {
+        int n = 0;
+        try {
+            if (vehicle.hasContainer()) {
+                var inv = vehicle.getInventory();
+                for (int i = 0; i < inv.getSlots(); i++) {
+                    var st = inv.getStackInSlot(i);
+                    if (!st.isEmpty() && st.is(item)) n += st.getCount();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return n;
+    }
+
+    /**
+     * 先从载具储物空间扣一个，没有容器时回落到玩家背包。
+     * 这样"内置"的语义成立：弹药随车走，人换了车照样有。
+     */
+    private static boolean consumeFromVehicle(VehicleEntity vehicle, Item item, Player player) {
+        try {
+            if (vehicle.hasContainer()) {
+                var inv = vehicle.getInventory();
+                for (int i = 0; i < inv.getSlots(); i++) {
+                    var st = inv.getStackInSlot(i);
+                    if (!st.isEmpty() && st.is(item)) {
+                        inv.extractItem(i, 1, false);
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        var pinv = player.getInventory();
+        for (int i = 0; i < pinv.getContainerSize(); i++) {
+            var st = pinv.getItem(i);
+            if (!st.isEmpty() && st.is(item)) {
+                st.shrink(1);
                 return true;
             }
         }

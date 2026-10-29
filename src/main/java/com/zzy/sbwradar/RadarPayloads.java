@@ -112,7 +112,7 @@ public final class RadarPayloads {
 
     /** Server -> client: current mode / lock state for the player's vehicle. */
     public record StateSync(int vehicleId, String mode, int targetId, String targetName, int trackedCount,
-                            int widthDeg, int guidedCount)
+                            int widthDeg, int guidedCount, int chaffCount)
             implements CustomPacketPayload {
         public static final Type<StateSync> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(SbwRadarMod.MODID, "state"));
         public static final StreamCodec<FriendlyByteBuf, StateSync> CODEC = StreamCodec.of(
@@ -124,9 +124,10 @@ public final class RadarPayloads {
                     buf.writeVarInt(p.trackedCount());
                     buf.writeVarInt(p.widthDeg());
                     buf.writeVarInt(p.guidedCount());
+                    buf.writeVarInt(p.chaffCount());
                 },
                 buf -> new StateSync(buf.readVarInt(), readStr(buf), buf.readVarInt(), readStr(buf),
-                        buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
+                        buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

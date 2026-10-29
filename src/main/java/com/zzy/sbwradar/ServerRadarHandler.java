@@ -161,7 +161,8 @@ public final class ServerRadarHandler {
                         target == null ? "" : target.getName().getString(),
                         state.lastHostiles.size(),
                         (int) Math.round(state.widthDeg > 0 ? state.widthDeg : 60.0),
-                        RadarMissileControl.activeFor(vehicle.getId())));
+                        RadarMissileControl.activeFor(vehicle.getId()),
+                        CounterMeasures.chaffCount(vehicle)));
             }
         }
     }
