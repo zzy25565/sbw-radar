@@ -32,6 +32,7 @@ public final class SbwRadarMod {
         NeoForge.EVENT_BUS.register(ServerRadarHandler.class);
         NeoForge.EVENT_BUS.register(RadarMissileControl.class);
         NeoForge.EVENT_BUS.register(SplitAirDefense.class);   // 分体式防空：雷达车指挥发射车
+        NeoForge.EVENT_BUS.register(CannonAirDefense.class);  // 机炮防空：近炸拦截 + 驾束导弹
         NeoForge.EVENT_BUS.register(IrMissileControl.class);
         NeoForge.EVENT_BUS.register(AmmoInterceptor.class);
         NeoForge.EVENT_BUS.register(AaProximityFuze.class);

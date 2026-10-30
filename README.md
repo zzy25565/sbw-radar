@@ -15,6 +15,43 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 - **干扰弹内置**：热诱弹走 SBW 车载诱饵池，箔条独立，存在储物空间、HUD 分两行显示（1.11.0）
 - **数据链制导**：雷达制导弹通过数据链接收雷达车上行数据；主雷达脱锁时**自动换主**到
   其它能锁定目标的雷达车，直到自身导引头开机（1.12.0）
+- **机炮防空**：雷达"锁定"来袭弹药 → 机炮自动换对空弹（近炸）拦截；超出机炮射程改打
+  **驾束制导**小导弹——无需锁定，弹沿雷达波束飞向威胁方向（1.13.0）
+
+## 机炮防空（1.13.0）
+
+所有带机炮的防空车（`Type=AA`、有人驾驶）获得**物理拦截**能力——真弹丸、真弹道、真引信，
+不再是 AmmoInterceptor 那种"粒子 + 直接销毁"的抽象拦截。
+
+### 机炮模式（威胁 ≤ `gunRange` 56 格）
+
+1. 每车每 tick 找来袭弹药：探测半径 96 格内、正在逼近、非本车发射的投射物，取最近的一个
+2. **解算提前量**：按弹速 48 块/秒两遍迭代算拦截点
+3. **自动换弹**：扫描武器的弹药索引，找到 `small_shell_aa`（小口径对空炮弹）就切过去；
+   找不到就保持原弹——因为拦截弹都由本类的**近炸引信**兜底（弹进入威胁 3 格内自爆并摧毁威胁）
+4. `GunData.shoot()` 真实开火（有弹道、有曳光、有声音），弹丸注册进近炸追踪
+
+### 驾束导弹模式（威胁 > 56 格，≤ `beamSam.maxRange` 192 格）
+
+无需锁定、无需数据链——**驾束制导**：发射一枚小导弹（默认 `superbwarfare:ru_9m336`），
+每 tick 把弹的目标点更新为「发射器 → 威胁当前位置」的波束延长线，波束随雷达跟踪实时摆动；
+弹进入威胁 4.5 格内起爆。冷却 100 tick，同一威胁同一时刻只分配一枚。
+
+### 配置
+
+| 键 | 说明 |
+|---|---|
+| `cannonAirDefense.enable` | 总开关 |
+| `cannonAirDefense.detectRadius` | 来袭弹药探测半径（96） |
+| `cannonAirDefense.gunRange` | 机炮交战上限（56），超过转驾束导弹 |
+| `cannonAirDefense.fireInterval` / `fuzeRadius` | 射击间隔 / 拦截弹近炸半径 |
+| `beamSam.enable` / `maxRange` / `cooldown` | 驾束导弹开关 / 射程 / 冷却 |
+| `beamSam.fuzeRadius` / `entityId` | 导弹近炸半径 / 使用的导弹实体 |
+
+### 与 AmmoInterceptor 的关系
+
+`AmmoInterceptor`（1.6.x 的抽象拦截）保留且默认关闭 `intercept.vehicles` 列表为空时不起作用——
+两者可以共存，但注意别对同一台车同时启用（抽象拦截会先销毁威胁，机炮就没得打了）。
 
 ## 数据链制导（1.12.0）
 
@@ -182,6 +219,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 | `radar.verticalSweep` / `verticalSweepMax` | 竖向半角默认值 / 上限（默认 45，可到 89） |
 | `radar.verticalSweepSteps` | 竖向切档档位表 |
 | `datalink.*` | 数据链制导（见上节） |
+| `cannonAirDefense.*` / `beamSam.*` | 机炮防空：拦截 / 驾束导弹 |
 
 ## 编译
 

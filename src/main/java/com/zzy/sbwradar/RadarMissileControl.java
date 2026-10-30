@@ -301,6 +301,11 @@ public final class RadarMissileControl {
         return false;
     }
 
+    /** 供机炮防空读取弹种 id（public 包装）。 */
+    public static String projectileIdOf(AmmoConsumer consumer) {
+        return projectileId(consumer);
+    }
+
     private static String projectileId(AmmoConsumer consumer) {
         if (consumer == null) return null;
         try {

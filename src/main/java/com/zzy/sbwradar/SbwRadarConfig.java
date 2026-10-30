@@ -317,6 +317,50 @@ public final class SbwRadarConfig {
             .comment("Datalink coverage radius around the radar vehicle (blocks); missiles outside get no updates")
             .defineInRange("datalink.range", 256.0, 16.0, 2048.0);
 
+    // ── 机炮防空（雷达锁定来袭弹药 → 机炮自动换近炸拦截 + 驾束导弹）──
+
+    public static final ModConfigSpec.BooleanValue CAD_ENABLE = BUILDER
+            .comment("Cannon AA: radar-locked incoming ammo is engaged by the vehicle's own cannon,",
+                    "auto-switching to AA (proximity-fuzed) shells; out-of-gun-range threats get a",
+                    "beam-riding small SAM (no lock needed)")
+            .define("cannonAirDefense.enable", true);
+
+    public static final ModConfigSpec.DoubleValue CAD_DETECT_RADIUS = BUILDER
+            .comment("Threat detection radius (blocks)")
+            .defineInRange("cannonAirDefense.detectRadius", 96.0, 16.0, 512.0);
+
+    public static final ModConfigSpec.DoubleValue CAD_GUN_RANGE = BUILDER
+            .comment("Max threat distance the cannon engages at (blocks); beyond this the beam SAM takes over")
+            .defineInRange("cannonAirDefense.gunRange", 56.0, 8.0, 256.0);
+
+    public static final ModConfigSpec.IntValue CAD_FIRE_INTERVAL = BUILDER
+            .comment("Ticks between cannon shots while engaging")
+            .defineInRange("cannonAirDefense.fireInterval", 4, 1, 40);
+
+    public static final ModConfigSpec.DoubleValue CAD_FUZE_RADIUS = BUILDER
+            .comment("Proximity fuze radius of interceptor shells vs the incoming ammo (blocks)")
+            .defineInRange("cannonAirDefense.fuzeRadius", 3.0, 0.5, 16.0);
+
+    public static final ModConfigSpec.BooleanValue BEAM_ENABLE = BUILDER
+            .comment("Beam-riding small SAM for threats beyond cannon range (no lock needed)")
+            .define("beamSam.enable", true);
+
+    public static final ModConfigSpec.DoubleValue BEAM_MAX_RANGE = BUILDER
+            .comment("Max threat distance for the beam SAM (blocks)")
+            .defineInRange("beamSam.maxRange", 192.0, 16.0, 1024.0);
+
+    public static final ModConfigSpec.IntValue BEAM_COOLDOWN = BUILDER
+            .comment("Cooldown between beam SAM launches per vehicle (ticks)")
+            .defineInRange("beamSam.cooldown", 100, 10, 1200);
+
+    public static final ModConfigSpec.DoubleValue BEAM_FUZE_RADIUS = BUILDER
+            .comment("SAM fuze radius vs the incoming ammo (blocks)")
+            .defineInRange("beamSam.fuzeRadius", 4.5, 0.5, 32.0);
+
+    public static final ModConfigSpec.ConfigValue<String> BEAM_ENTITY = BUILDER
+            .comment("Missile entity id used as the beam-riding interceptor")
+            .define("beamSam.entityId", "superbwarfare:ru_9m336");
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private SbwRadarConfig() {}
