@@ -281,6 +281,42 @@ public final class SbwRadarConfig {
             .comment("Only remote-fire launchers that have no passenger (leave manned ones under player control)")
             .define("split.onlyUnmanned", true);
 
+    // ── 数据链制导（底层原语，默认关闭，接线后由 datalink.enable 打开）──
+
+    public static final ModConfigSpec.BooleanValue DATALINK_ENABLE = BUILDER
+            .comment("Master switch for the datalink guidance layer (inert until wired into the steering loop)")
+            .define("datalink.enable", true);
+
+    public static final ModConfigSpec.IntValue DATALINK_UPLINK_INTERVAL = BUILDER
+            .comment("Ticks between two successful uplinks on one channel - models the datalink data rate")
+            .defineInRange("datalink.uplinkInterval", 5, 1, 100);
+
+    public static final ModConfigSpec.IntValue DATALINK_LINK_TIMEOUT = BUILDER
+            .comment("Ticks without uplink before a channel degrades to inertial flight")
+            .defineInRange("datalink.linkTimeout", 40, 5, 600);
+
+    public static final ModConfigSpec.IntValue DATALINK_HARD_TIMEOUT = BUILDER
+            .comment("Ticks without uplink before the channel is lost (missile must rely on its own seeker)")
+            .defineInRange("datalink.hardTimeout", 120, 10, 1200);
+
+    public static final ModConfigSpec.IntValue DATALINK_MAX_CHANNELS = BUILDER
+            .comment("Max simultaneous lock channels per radar vehicle (independent of missile count -",
+                    "several missiles may share one channel, semi-active style)")
+            .defineInRange("datalink.maxChannels", 4, 1, 16);
+
+    public static final ModConfigSpec.BooleanValue DATALINK_AUTO_HANDOFF = BUILDER
+            .comment("When the current datalink source degrades/loses the target, automatically",
+                    "re-target the missile onto another radar vehicle that can still lock it")
+            .define("datalink.autoHandoff", true);
+
+    public static final ModConfigSpec.IntValue DATALINK_HANDOFF_COOLDOWN = BUILDER
+            .comment("Ticks between handoff attempts per missile (prevents channel thrashing)")
+            .defineInRange("datalink.handoffCooldown", 20, 1, 600);
+
+    public static final ModConfigSpec.DoubleValue DATALINK_RANGE = BUILDER
+            .comment("Datalink coverage radius around the radar vehicle (blocks); missiles outside get no updates")
+            .defineInRange("datalink.range", 256.0, 16.0, 2048.0);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private SbwRadarConfig() {}

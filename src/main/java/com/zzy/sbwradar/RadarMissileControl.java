@@ -166,6 +166,11 @@ public final class RadarMissileControl {
         guided.climbTicks = spec != null ? spec.climbTicks() : SbwRadarConfig.MISSILE_CLIMB_TICKS.get();
         guided.seekerRange = spec != null ? spec.seekerRange() : SbwRadarConfig.MISSILE_SEEKER_RANGE.get();
         GUIDED.put(missile, guided);
+        if (SbwRadarConfig.DATALINK_ENABLE.get()) {
+            long tick = level.getServer().getTickCount();
+            int ch = DatalinkGuidance.open(radarVehicleId, target, tick);
+            if (ch > 0) DatalinkGuidance.subscribe(missile, ch, ownerUuid, tick);
+        }
         return true;
     }
 
@@ -313,6 +318,7 @@ public final class RadarMissileControl {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        DatalinkGuidance.tick(event.getServer());        // 数据链：自动换主 + 老信道回收
         if (GUIDED.isEmpty()) return;
         MinecraftServer server = event.getServer();
         if (server == null) return;
@@ -341,6 +347,7 @@ public final class RadarMissileControl {
             Guided g = entry.getValue();
 
             if (missile.isRemoved() || !missile.isAlive() || missile.level() == null) {
+                DatalinkGuidance.unsubscribe(missile);
                 it.remove();
                 continue;
             }
@@ -385,6 +392,33 @@ public final class RadarMissileControl {
                 continue;
             }
 
+            // ── 数据链制导：主雷达失锁/目标出视野时，用其它雷达（或本雷达最后上行）的
+            //    目标数据继续追踪，直到弹自己的导引头开机。红外弹不走这里（无订阅）。──
+            if (target == null && SbwRadarConfig.DATALINK_ENABLE.get()) {
+                Vec3 radarPos = radarVehicle != null ? radarVehicle.position() : null;
+                DatalinkGuidance.TargetData td =
+                        DatalinkGuidance.get(missile, radarPos, server.getTickCount());
+                if (td.hasFix()) {
+                    g.lastKnown = td.position();
+                    g.lostTicks = 0;
+                    double dist = missile.position().distanceTo(td.position());
+                    if (dist <= g.seekerRange) {
+                        Entity acq = acquireTerminal(missile, g, g.seekerRange);   // 导引头开机
+                        if (acq != null) {
+                            g.terminal = true;
+                            DatalinkGuidance.unsubscribe(missile);                 // 弹不再需要数据链
+                            steer(missile, acq);
+                            continue;
+                        }
+                    }
+                    if (missile instanceof MissileProjectile mp) {
+                        mp.setTargetVec(td.position());      // 按上行数据飞行（含惯性外推）
+                        mp.setLost(false);
+                    }
+                    continue;
+                }
+            }
+
             // radar lost: try terminal active-seeker acquisition before giving up
             Entity acquired = acquireTerminal(missile, g, g.seekerRange);
             if (acquired != null) {
@@ -400,6 +434,7 @@ public final class RadarMissileControl {
                 mp.setTargetVec(g.lastKnown); // keep flying to the last known point
             }
             if (g.lostTicks > timeout) {
+                DatalinkGuidance.unsubscribe(missile);
                 missile.discard();
                 it.remove();
             }

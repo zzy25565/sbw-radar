@@ -150,6 +150,13 @@ public final class ServerRadarHandler {
             result.sendToClients(player, level, SbwRadarConfig.SHARE_WITH_TEAMMATES.get());
             state.lastHostiles = new ArrayList<>(result.getHostileIds());
             state.lastScanTick = level.getServer().getTickCount();
+            if (SbwRadarConfig.DATALINK_ENABLE.get() && !state.lastHostiles.isEmpty()) {
+                long tick = level.getServer().getTickCount();
+                for (int hid : state.lastHostiles) {          // 刷新该雷达对所有可见目标的信道
+                    Entity t = level.getEntity(hid);
+                    if (t != null) DatalinkGuidance.refresh(vehicle.getId(), t, tick);
+                }
+            }
         }
 
         if (--state.syncCooldown <= 0) {
@@ -393,6 +400,21 @@ public final class ServerRadarHandler {
     public static RadarMode modeOf(int vehicleId) {
         VehicleState s = STATES.get(vehicleId);
         return s == null ? null : s.mode;
+    }
+
+    /**
+     * 能锁定给定目标的所有雷达车（数据链自动换主的候选池）。
+     * TRK 正锁着它，或 TWS 图像里还能看到它，都算「可以锁定」。
+     */
+    public static java.util.List<Integer> radarsTracking(int targetEntityId) {
+        java.util.List<Integer> out = new java.util.ArrayList<>();
+        STATES.forEach((id, s) -> {
+            if (s.targetId == targetEntityId
+                    || (s.mode == RadarMode.TWS && s.lastHostiles.contains(targetEntityId))) {
+                out.add(id);
+            }
+        });
+        return out;
     }
 
     /** Vehicles currently holding a TRK lock (used by the split air-defence controller). */

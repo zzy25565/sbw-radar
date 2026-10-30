@@ -1,15 +1,5 @@
 # SBW Radar
 
-当前版本 **1.11.1**（2026-10-29）。[下载正式版](https://github.com/zzy25565/sbw-radar/releases/tag/v1.11.1-loadout)；空空导弹联动配套 [sbw-loadout 1.3.4](https://github.com/zzy25565/sbw-loadout/releases/tag/v1.3.4)。客户端和服务端同时更新两个 JAR，移出旧版。
-
-本次仅接入挂载模组的空空导弹：AIM-54A/C、PL-12/12A、R-40RD/TD、R-73/73L、R-77/77-1。雷达弹共用 TRK / TWS、照射通道与箔条；红外弹共用热目标锁定与热诱弹，直接登记已发射的挂载弹体，不另外生成导弹。Kh-38MT 空地弹和航弹不接入空空红外接口；既有 9M336 雷达联动保留。
-
-基于 GitHub 1.11.0 合并，保留分体式防空、自主发射及原因提示；挂载飞机/直升机继续由驾驶员手动发射，不进入地面防空自主流程，也不允许通过原生远程发射绕过挂载库存。自主地面弹体缺少玩家 UUID 时不会在末段搜索中抛异常。
-
-空空弹爆炸伤害由配套挂载 1.3.4 降低为旧值的 50%，直击和爆炸半径保留。联动近炸调用弹体自身 SBW 爆炸，避免绕过弹药伤害。自机、乘员、友军及遮挡目标不触发联动近炸；箔条/热诱后脱锁状态保留至相应弹体存档。
-
-默认 O 切模式、J 切 TRK 目标、P 切宽度、G 热诱弹、H 箔条。修复单独按 G/H 被提前忽略的问题。已有 options.txt 不自动重写，旧 K/L 键位请自行调整。SBW 将无队伍驾驶员的载具列为中立；雷达导弹只接受服务端敌方航迹。联合操作和验收见 [挂载适配说明](https://github.com/zzy25565/sbw-loadout/blob/main/docs/空空导弹适配_1.3.4.md)。
-
 Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 
 ## 功能
@@ -23,6 +13,51 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 - **机载雷达**：飞机/直升机机头雷达，固定几档扫描角度，**角度越窄刷新越快**（1.8.0）
 - **竖向扫描范围**：雷达有了俯仰锥，游戏内按 `;` 切档，上限可配（1.9.0 / 1.10.0）
 - **干扰弹内置**：热诱弹走 SBW 车载诱饵池，箔条独立，存在储物空间、HUD 分两行显示（1.11.0）
+- **数据链制导**：雷达制导弹通过数据链接收雷达车上行数据；主雷达脱锁时**自动换主**到
+  其它能锁定目标的雷达车，直到自身导引头开机（1.12.0）
+
+## 数据链制导（1.12.0）
+
+**弹不再依赖"实时无限精度"数据。** 雷达制导弹通过数据链接收任意一台能锁定目标的雷达车
+上行数据；主雷达脱锁时自动换主，直到弹自身导引头开机。
+
+三层概念：
+
+| 概念 | 语义 |
+|---|---|
+| **信道** | 「某台雷达 × 某个目标」的一条链路。**多弹共享一条信道**（半主动语义）；同一目标可被多台雷达各开一条——这就是换主的候选池 |
+| **订阅** | 弹 → 信道。弹必须在主雷达的数据链覆盖半径内，飞出去就断链 |
+| **链路质量** | `uplinkInterval` 内才允许一次上行；超 `linkTimeout` → DEGRADED（按速度惯性外推）；超 `hardTimeout` → LOST |
+
+### 生命周期
+
+```
+发射 → open(雷达,目标) + subscribe(弹,信道)
+  ↓ 主雷达持续扫描 → refresh()（受上行间隔节流）
+  ↓ 主雷达脱锁 → get() 返回 DEGRADED（惯性外推位置），弹继续按上行数据飞
+  ↓ tick() 自动换主：radarsTracking(目标) 里找其它雷达（活/非残骸/在弹覆盖内/配额未满）
+  ↓ 进入导引头射程 → acquireTerminal() 开机成功 → unsubscribe() 断链，弹自主飞行
+```
+
+- **红外弹天然不参与**：`IrMissileControl` 从不订阅，订阅表里不会有 IR 弹
+- 换主候选比"TRK 正锁"宽：TWS 图像里还能看到目标也算"可以锁定"（`radarsTracking`）
+- 换主后不做位置平滑——两台雷达测的不是同一个点，弹的位置参考会跳一下（真实系统同样如此）
+- 换主冷却 20 tick，防跳台
+- 分体式防空（`SplitAirDefense`）发射的弹**自动获得数据链**——它们走同一条 `spawnGuided`
+
+### 配置
+
+| 键 | 说明 |
+|---|---|
+| `datalink.enable` | 总开关（默认 true） |
+| `datalink.uplinkInterval` | 上行间隔（tick）——数据率 |
+| `datalink.linkTimeout` / `hardTimeout` | 降级 / 失联阈值（tick） |
+| `datalink.maxChannels` | 每台雷达的**信道**上限（不是弹数上限） |
+| `datalink.range` | 数据链覆盖半径（块） |
+| `datalink.autoHandoff` / `handoffCooldown` | 自动换主开关 / 冷却 |
+
+底层实现：`DatalinkGuidance.java`——只回答 `get()`（弹手里有什么数据），**不转向弹体**；
+制导律仍由 `RadarMissileControl` 执行，两者可独立替换。
 
 ## 干扰弹：内置 + 用原生 UI（1.11.0）
 
@@ -128,7 +163,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 
 ## 配置
 
-世界目录的 `serverconfig/sbw_radar-server.toml`（开发运行环境可能位于 `run/config/`）。
+`config/sbw_radar-common.toml`
 
 | 键 | 说明 |
 |---|---|
@@ -146,6 +181,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 | `airborne.sectors` / `airborne.refreshBase` | 固定扫描档位 / 最宽档刷新间隔 |
 | `radar.verticalSweep` / `verticalSweepMax` | 竖向半角默认值 / 上限（默认 45，可到 89） |
 | `radar.verticalSweepSteps` | 竖向切档档位表 |
+| `datalink.*` | 数据链制导（见上节） |
 
 ## 编译
 
@@ -157,15 +193,3 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 ```bash
 gradle jar            # 产物在 build/libs/
 ```
-
-编译 1.11.1 时还需相邻 `../sbw_loadout/build/libs/sbw-loadout-1.3.4.jar` 作为可选接口的 compileOnly 依赖，发布 JAR 不包含挂载代码。若有配套挂载的 NeoForge 开发环境，可复用其已解析依赖，省去准备以上离线依赖：
-
-```powershell
-# 在 sbw_loadout 目录，JDK 21
-.\gradlew.bat build exportCompileClasspath
-.\gradlew.bat -p ..\sbw_radar '-PsharedClasspathFile=../sbw_loadout/build/radar-compile-classpath.txt' build
-.\gradlew.bat -Pgametest -PradarCompat runGameTestServer
-```
-
-两个模组均可独立运行；同装时最低配套版本为挂载 1.3.4 / 雷达 1.11.1。生产构建完毕应在挂载目录执行不带 gametest、radarCompat 或 smoke 参数的 `clean build`，排除开发夹具。
-
