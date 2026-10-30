@@ -90,7 +90,65 @@ public final class ClientRenderers {
 
     // -- 2D radar scope --
 
+    /** 来袭弹药屏幕标记（机炮防空，1.13.2）：视野内标在导弹正上方，出视野贴左/右上角。 */
     @SubscribeEvent
+    public static void onRenderThreatMarker(RenderGuiEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        if (player == null) return;
+        if (!(player.getVehicle() instanceof VehicleEntity v)) return;
+        ClientThreatState.Threat t = ClientThreatState.get(v.getId(), ClientThreatState.now());
+        if (t == null) return;
+
+        GuiGraphics g = event.getGuiGraphics();
+        Vec3 pos = t.pos();
+
+        // 世界 → 屏幕（FOV 投影）
+        Camera cam = mc.gameRenderer.getMainCamera();
+        Vec3 rel = pos.subtract(cam.getPosition());
+        org.joml.Vector3f v3 = new org.joml.Vector3f((float) rel.x, (float) rel.y, (float) rel.z);
+        v3.rotate(cam.rotation().conjugate(new org.joml.Quaternionf()));
+        boolean front = v3.z() < 0;
+        double fov = mc.options.fov().get();
+        double aspect = mc.getWindow().getScreenWidth() / (double) mc.getWindow().getScreenHeight();
+        double tanHalf = Math.tan(Math.toRadians(fov) / 2);
+        double nx, ny;
+        if (front) {
+            nx = v3.x() / (-v3.z()) / (tanHalf * aspect);
+            ny = v3.y() / (-v3.z()) / tanHalf;
+        } else {
+            nx = v3.x() >= 0 ? 1.6 : -1.6;      // 在身后：按水平方位放到对应侧
+            ny = -0.85;
+        }
+        int gw = g.guiWidth(), gh = g.guiHeight();
+        int cx, cy;
+        if (front && Math.abs(nx) <= 1.0 && Math.abs(ny) <= 1.0) {
+            cx = (int) (gw / 2.0 * (1 + nx));
+            cy = (int) (gh / 2.0 * (1 + ny)) - 26;      // 视野内：导弹正上方
+        } else {
+            cx = (int) (gw / 2.0 * (1 + Math.max(-0.92, Math.min(0.92, nx))));
+            cy = (int) (gh * 0.14);                     // 出视野：屏幕上方
+        }
+
+        int GREEN = 0xFF1B5E20;
+        g.renderOutline(cx - 8, cy - 10, cx + 8, cy + 10, GREEN);      // 外框
+        seg(g, cx - 5, cy - 4, cx + 5, cy - 4, GREEN);                 // 内三角（向下）
+        seg(g, cx + 5, cy - 4, cx, cy + 5, GREEN);
+        seg(g, cx, cy + 5, cx - 5, cy - 4, GREEN);
+        double dist = cam.getPosition().distanceTo(pos);
+        g.drawCenteredString(mc.font, (int) dist + "m", cx, cy + 12, 0xFF1B5E20);
+    }
+
+    private static void seg(GuiGraphics g, int x0, int y0, int x1, int y1, int c) {
+        int dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        int steps = Math.max(1, Math.max(dx, dy));
+        for (int i = 0; i <= steps; i++) {
+            int x = x0 + (x1 - x0) * i / steps;
+            int y = y0 + (y1 - y0) * i / steps;
+            g.fill(x, y, x + 1, y + 1, c);
+        }
+    }
+
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;

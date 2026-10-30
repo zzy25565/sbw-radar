@@ -62,11 +62,13 @@ public final class ClientInput {
             lastLevel = mc.level;
             ClientRadarState.clear(); // drop stale modes after dimension change / respawn
             ClientIrState.clear();
+            ClientThreatState.clear();
         }
         if (mc.player == null) return;
 
         // keep the contact memory from growing while no radar HUD is drawn
         ClientRenderers.tickMemory();
+        ClientThreatState.tick();
 
         // on foot for a while: drop the last vehicle's radar state (no stale mode text)
         if (mc.player.getVehicle() == null) {

@@ -41,6 +41,9 @@ public final class RadarNetwork {
         registrar.playToClient(RadarPayloads.IrState.TYPE, RadarPayloads.IrState.CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientIrState.set(payload)));
 
+        registrar.playToClient(ThreatSync.TYPE, ThreatSync.CODEC,
+                (payload, context) -> context.enqueueWork(() -> ClientThreatState.set(payload)));
+
         registrar.playToClient(RadarPayloads.StateSync.TYPE, RadarPayloads.StateSync.CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientRadarState.set(payload)));
     }

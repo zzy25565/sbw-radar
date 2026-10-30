@@ -65,8 +65,8 @@ public final class CannonAirDefense {
 
     /** 车辆 id → 已锁定的威胁 */
     private static final Map<Integer, Entity> LOCK = new HashMap<>();
-    /** 车辆 id → 上次告知 tick */
-    private static final Map<Integer, Long> NOTIFY = new HashMap<>();
+    /** 车辆 id → 上次 ThreatSync 下发 tick */
+    private static final Map<Integer, Long> SYNC = new HashMap<>();
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -95,6 +95,27 @@ public final class CannonAirDefense {
     private static void monitor(ServerLevel level, Player player, VehicleEntity v, long now) {
         int vid = v.getId();
         Entity locked = LOCK.get(vid);
+        Entity threat = locked != null ? locked : findThreat(level, v);
+
+        // 威胁数据下发（锁定/未锁定都发）：客户端画屏幕标记；威胁消失发清除包
+        long last = SYNC.getOrDefault(vid, -1_000_000L);
+        if (threat != null) {
+            if (now - last >= 5) {
+                SYNC.put(vid, now);
+                if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                    Vec3 p3 = threat.position();
+                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,
+                            new ThreatSync(vid, true,
+                                    (float) p3.x, (float) p3.y, (float) p3.z));
+                }
+            }
+        } else if (SYNC.containsKey(vid)) {
+            SYNC.remove(vid);
+            if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,
+                        new ThreatSync(vid, false, 0, 0, 0));
+            }
+        }
 
         // 已锁定：有效性检查 + 拦截
         if (locked != null) {
@@ -115,18 +136,7 @@ public final class CannonAirDefense {
                 player.displayClientMessage(Component.literal(
                         "拦截中(" + mode + ") · 距离 " + (int) dist + "m"), true);
             }
-            return;
         }
-
-        // 未锁定：仅告知（节流），绝不自动开火
-        Entity threat = findThreat(level, v);
-        if (threat == null) return;
-        long last = NOTIFY.getOrDefault(vid, -1_000_000L);
-        int interval = Math.max(10, SbwRadarConfig.CAD_NOTIFY_INTERVAL.get());
-        if (now - last < interval) return;
-        NOTIFY.put(vid, now);
-        player.displayClientMessage(Component.literal(
-                "⚠ 来袭弹药 · 距离 " + (int) threat.distanceTo(v) + "m · 按锁定键拦截"), true);
     }
 
     // ── 手动锁定（键位 → payload → 这里）──
