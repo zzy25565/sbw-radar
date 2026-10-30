@@ -18,10 +18,22 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 - **机炮防空**：雷达"锁定"来袭弹药 → 机炮自动换对空弹（近炸）拦截；超出机炮射程改打
   **驾束制导**小导弹——无需锁定，弹沿雷达波束飞向威胁方向（1.13.0）
 
-## 机炮防空（1.13.0）
+## 机炮防空（1.13.0 / 1.13.1 手动授权）
 
-所有带机炮的防空车（`Type=AA`、有人驾驶）获得**物理拦截**能力——真弹丸、真弹道、真引信，
-不再是 AmmoInterceptor 那种"粒子 + 直接销毁"的抽象拦截。
+所有带机炮的防空车（`Type=AA`、有人驾驶）获得**物理拦截**能力——真弹丸、真弹道、真引信。
+
+**1.13.1 改为手动授权制**：雷达探测到来袭弹药时**只告知不开火**（actionbar 节流警告），
+玩家按 `.` 键锁定后才开始拦截，再按一次解除：
+
+```
+⚠ 来袭弹药 · 距离 43m · 按锁定键拦截     ← 未锁定时每 30t 提示一次
+已锁定来袭弹药 · 43m · 自动拦截开始        ← 按 . 后
+拦截中(机炮) · 距离 27m                   ← 锁定期间每秒刷新
+目标丢失，已解除锁定                      ← 威胁消失/被击落
+```
+
+锁定后系统才做三件事：解提前量（弹速 48块/s 两遍迭代）→ 自动切对空弹
+（扫弹药索引找 `small_shell_aa`，找不到保持原弹由近炸兜底）→ `GunData.shoot()` 真实开火。
 
 ### 机炮模式（威胁 ≤ `gunRange` 56 格）
 
@@ -43,6 +55,7 @@ Superb Warfare 地面雷达附属（Minecraft 1.21.1 / NeoForge）。
 |---|---|
 | `cannonAirDefense.enable` | 总开关 |
 | `cannonAirDefense.detectRadius` | 来袭弹药探测半径（96） |
+| `cannonAirDefense.notifyInterval` | 未锁定时的警告间隔（30t） |
 | `cannonAirDefense.gunRange` | 机炮交战上限（56），超过转驾束导弹 |
 | `cannonAirDefense.fireInterval` / `fuzeRadius` | 射击间隔 / 拦截弹近炸半径 |
 | `beamSam.enable` / `maxRange` / `cooldown` | 驾束导弹开关 / 射程 / 冷却 |

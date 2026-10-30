@@ -10,5 +10,6 @@
   "key.sbw_radar.cycle_vertical": "Cycle radar vertical range",
   "tips.superbwarfare.flare.ready": "Flares ready",
   "tips.superbwarfare.flare.reloading": "Flares reloading",
-  "tips.superbwarfare.flare.none": "No flares"
+  "tips.superbwarfare.flare.none": "No flares",
+  "key.sbw_radar.lock_ammo": "Lock incoming ammo (gun intercept)"
 }

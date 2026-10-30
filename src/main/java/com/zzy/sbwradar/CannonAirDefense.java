@@ -5,6 +5,8 @@ import com.atsuishio.superbwarfare.data.gun.ShootParameters;
 import com.atsuishio.superbwarfare.entity.projectile.DestroyableProjectile;
 import com.atsuishio.superbwarfare.entity.vehicle.base.VehicleEntity;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -61,41 +63,118 @@ public final class CannonAirDefense {
 
     // ── 主循环 ──
 
+    /** 车辆 id → 已锁定的威胁 */
+    private static final Map<Integer, Entity> LOCK = new HashMap<>();
+    /** 车辆 id → 上次告知 tick */
+    private static final Map<Integer, Long> NOTIFY = new HashMap<>();
+
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (!SbwRadarConfig.SPEC.isLoaded()) return;
         if (!SbwRadarConfig.CAD_ENABLE.get()) return;
+        MinecraftServer server = event.getServer();
+        long now = server.getTickCount();
 
-        for (var level : event.getServer().getAllLevels()) {
+        for (ServerLevel level : server.getAllLevels()) {
+            tickFuzes(level);
+            tickBeams(level);
+        }
+
+        for (ServerLevel level : server.getAllLevels()) {
             if (level.players().isEmpty()) continue;
             for (Player player : level.players()) {
                 if (!(player.getVehicle() instanceof VehicleEntity v) || v.isWreck()) continue;
                 if (!isCannonAA(v)) continue;
-
-                Entity threat = findThreat(level, v);
-                if (threat == null) continue;
-
-                double dist = threat.distanceTo(v);
-                if (dist <= SbwRadarConfig.CAD_GUN_RANGE.get()) {
-                    gunEngage(level, v, threat);
-                } else if (SbwRadarConfig.BEAM_ENABLE.get() && dist <= SbwRadarConfig.BEAM_MAX_RANGE.get()) {
-                    beamEngage(level, v, threat);
-                }
+                monitor(level, player, v, now);
             }
-        }
-        // 近炸判定 + 驾束波束更新
-        if (level(event) instanceof ServerLevel sl) {
-            tickFuzes(sl);
-            tickBeams(sl);
         }
     }
 
-    private static net.minecraft.world.level.Level level(ServerTickEvent.Post e) {
-        // 威胁/弹可能分布在多个维度；这里只处理主世界（拦截战都发生在主世界）
-        return e.getServer().overworld();
+    // ── 告知与锁定状态机 ──
+
+    private static void monitor(ServerLevel level, Player player, VehicleEntity v, long now) {
+        int vid = v.getId();
+        Entity locked = LOCK.get(vid);
+
+        // 已锁定：有效性检查 + 拦截
+        if (locked != null) {
+            if (!locked.isAlive() || locked.distanceTo(v) > SbwRadarConfig.CAD_DETECT_RADIUS.get()) {
+                LOCK.remove(vid);
+                player.displayClientMessage(Component.literal("目标丢失，已解除锁定"), true);
+                return;
+            }
+            double dist = locked.distanceTo(v);
+            if (dist <= SbwRadarConfig.CAD_GUN_RANGE.get()) {
+                gunEngage(level, v, locked);
+            } else if (SbwRadarConfig.BEAM_ENABLE.get()
+                    && dist <= SbwRadarConfig.BEAM_MAX_RANGE.get()) {
+                beamEngage(level, v, locked);
+            }
+            if (now % 20 == 0) {
+                String mode = dist <= SbwRadarConfig.CAD_GUN_RANGE.get() ? "机炮" : "驾束导弹";
+                player.displayClientMessage(Component.literal(
+                        "拦截中(" + mode + ") · 距离 " + (int) dist + "m"), true);
+            }
+            return;
+        }
+
+        // 未锁定：仅告知（节流），绝不自动开火
+        Entity threat = findThreat(level, v);
+        if (threat == null) return;
+        long last = NOTIFY.getOrDefault(vid, -1_000_000L);
+        int interval = Math.max(10, SbwRadarConfig.CAD_NOTIFY_INTERVAL.get());
+        if (now - last < interval) return;
+        NOTIFY.put(vid, now);
+        player.displayClientMessage(Component.literal(
+                "⚠ 来袭弹药 · 距离 " + (int) threat.distanceTo(v) + "m · 按锁定键拦截"), true);
+    }
+
+    // ── 手动锁定（键位 → payload → 这里）──
+
+    /** 切换锁定状态：未锁定 → 锁定最近的来袭弹药；已锁定 → 解除。 */
+    public static void lockIncoming(Player player, int vehicleId) {
+        if (!SbwRadarConfig.CAD_ENABLE.get()) return;
+        if (!(player.getVehicle() instanceof VehicleEntity v) || v.getId() != vehicleId) return;
+        if (!(player.level() instanceof ServerLevel level)) return;
+
+        int vid = v.getId();
+        if (LOCK.containsKey(vid)) {                       // toggle：解除
+            LOCK.remove(vid);
+            player.displayClientMessage(Component.literal("已解除锁定"), true);
+            return;
+        }
+
+        List<Entity> threats = findThreats(level, v);
+        if (threats.isEmpty()) {
+            player.displayClientMessage(Component.literal("没有可锁定的来袭弹药"), true);
+            return;
+        }
+        Entity threat = threats.get(0);
+        LOCK.put(vid, threat);
+        player.displayClientMessage(Component.literal(
+                "已锁定来袭弹药 · " + (int) threat.distanceTo(v) + "m · 自动拦截开始"), true);
     }
 
     // ── 威胁探测 ──
+
+    private static java.util.List<Entity> findThreats(ServerLevel level, VehicleEntity v) {
+        double radius = SbwRadarConfig.CAD_DETECT_RADIUS.get();
+        Vec3 center = v.position().add(0.0, 1.5, 0.0);
+        java.util.List<Entity> out = new java.util.ArrayList<>();
+        for (Entity e : level.getEntities(v, v.getBoundingBox().inflate(radius),
+                e -> e instanceof Projectile && e.isAlive() && !OWN.contains((Projectile) e))) {
+            Projectile p = (Projectile) e;
+            if (p.getOwner() == v) continue;
+            Vec3 rel = e.position().subtract(center);
+            double dist = rel.length();
+            if (dist < 4.0 || dist > radius) continue;
+            Vec3 dir = rel.scale(1.0 / dist);
+            if (-p.getDeltaMovement().dot(dir) <= 0) continue;     // 不是在逼近
+            out.add(e);
+        }
+        out.sort((a, b) -> Double.compare(a.distanceTo(v), b.distanceTo(v)));
+        return out;
+    }
 
     private static Entity findThreat(ServerLevel level, VehicleEntity v) {
         double radius = SbwRadarConfig.CAD_DETECT_RADIUS.get();

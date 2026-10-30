@@ -38,12 +38,16 @@ public final class ClientInput {
     public static final KeyMapping CYCLE_VERTICAL = new KeyMapping(
             "key.sbw_radar.cycle_vertical", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_SEMICOLON, "key.categories.sbw_radar");
 
+    public static final KeyMapping LOCK_AMMO = new KeyMapping(
+            "key.sbw_radar.lock_ammo", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_PERIOD, "key.categories.sbw_radar");
+
     /** MOD-bus listener: registered explicitly from the mod constructor (not the game bus). */
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         event.register(CYCLE_MODE);
         event.register(CYCLE_TARGET);
         event.register(CYCLE_WIDTH);
         event.register(CYCLE_VERTICAL);
+        event.register(LOCK_AMMO);
         event.register(DISPENSE_FLARE);
         event.register(DISPENSE_CHAFF);
     }
@@ -80,11 +84,12 @@ public final class ClientInput {
         boolean targetPressed = consume(CYCLE_TARGET);
         boolean widthPressed = consume(CYCLE_WIDTH);
         boolean verticalPressed = consume(CYCLE_VERTICAL);
+        boolean lockAmmoPressed = consume(LOCK_AMMO);
         boolean flarePressed = consume(DISPENSE_FLARE);
         boolean chaffPressed = consume(DISPENSE_CHAFF);
         // 修既有 bug：早退条件漏了诱饵弹，只按 G/H 时会被提前 return 掉
         if (!modePressed && !targetPressed && !widthPressed && !verticalPressed
-                && !flarePressed && !chaffPressed) return;
+                && !lockAmmoPressed && !flarePressed && !chaffPressed) return;
 
         Entity ridden = mc.player.getVehicle();
         if (!(ridden instanceof VehicleEntity vehicle)) return;
@@ -100,6 +105,9 @@ public final class ClientInput {
         }
         if (verticalPressed) {
             PacketDistributor.sendToServer(new RadarPayloads.CycleVertical(vehicle.getId()));
+        }
+        if (lockAmmoPressed) {
+            PacketDistributor.sendToServer(new RadarPayloads.LockAmmo(vehicle.getId()));
         }
         if (flarePressed) {
             PacketDistributor.sendToServer(new RadarPayloads.Dispense(0));

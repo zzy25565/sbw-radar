@@ -337,6 +337,10 @@ public final class SbwRadarConfig {
             .comment("Ticks between cannon shots while engaging")
             .defineInRange("cannonAirDefense.fireInterval", 4, 1, 40);
 
+    public static final ModConfigSpec.IntValue CAD_NOTIFY_INTERVAL = BUILDER
+            .comment("Ticks between incoming-ammo warnings while unlocked (manual-lock flow only)")
+            .defineInRange("cannonAirDefense.notifyInterval", 30, 5, 200);
+
     public static final ModConfigSpec.DoubleValue CAD_FUZE_RADIUS = BUILDER
             .comment("Proximity fuze radius of interceptor shells vs the incoming ammo (blocks)")
             .defineInRange("cannonAirDefense.fuzeRadius", 3.0, 0.5, 16.0);

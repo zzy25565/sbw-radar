@@ -29,6 +29,10 @@ public final class RadarNetwork {
                 (payload, context) -> context.enqueueWork(() ->
                         ServerRadarHandler.cycleVertical(context.player(), payload.vehicleId())));
 
+        registrar.playToServer(RadarPayloads.LockAmmo.TYPE, RadarPayloads.LockAmmo.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        CannonAirDefense.lockIncoming(context.player(), payload.vehicleId())));
+
         registrar.playToServer(RadarPayloads.Dispense.TYPE, RadarPayloads.Dispense.CODEC,
                 (payload, context) -> context.enqueueWork(() -> CounterMeasures.dispense(
                         context.player(),
