@@ -56,18 +56,18 @@ public final class LoadoutIntegration {
                 @Override public Entity lockedTarget(VehicleEntity v) {
                     return track(v,ServerRadarHandler.trackedTargetId(v.getId()));
                 }
-                @Override public Entity launchTarget(VehicleEntity v, cn.zzy.loadout.api.AmmoType a) {
+                public Entity launchTarget(VehicleEntity v, cn.zzy.loadout.api.AmmoType a) {
                     if(!SbwRadarConfig.MISSILE_ENABLE.get()) return null;
                     if(ServerRadarHandler.modeOf(v.getId())!=RadarMode.TWS) return lockedTarget(v);
                     if(!(v.getFirstPassenger() instanceof ServerPlayer p)) return null;
-                    var assigned=cn.zzy.loadout.guidance.RadarGuidance.assignedTargets(v);
+                    // 1.2.1 无 assignedTargets（分配去重），退化为"最近有效航迹"；
+                    // 装新版 loadout 后可恢复按已分配目标优先
                     return ServerRadarHandler.twsTracks(v.getId()).stream()
                             .map(id->track(v,id)).filter(e->e!=null
                                     && cn.zzy.loadout.guidance.RadarLocks.valid(p,v,a,e))
-                            .min(java.util.Comparator.<Entity>comparingInt(e->assigned.contains(e.getUUID()) ? 1 : 0)
-                                    .thenComparingDouble(e->e.distanceToSqr(v))).orElse(null);
+                            .min(java.util.Comparator.<Entity>comparingDouble(e->e.distanceToSqr(v))).orElse(null);
                 }
-                @Override public Entity trackedTarget(VehicleEntity v, java.util.UUID assigned) {
+                public Entity trackedTarget(VehicleEntity v, java.util.UUID assigned) {
                     if(!SbwRadarConfig.MISSILE_ENABLE.get() || !(v.level() instanceof ServerLevel l)) return null;
                     Entity target=l.getEntity(assigned);
                     if(target==null) return null;
@@ -80,9 +80,9 @@ public final class LoadoutIntegration {
                 @Override public int maxChannels(VehicleEntity v,int ammoLimit) {
                     return SbwRadarConfig.MISSILE_ENABLE.get() ? Math.min(ammoLimit,SbwRadarConfig.MISSILE_MAX_CONCURRENT.get()) : 0;
                 }
-                @Override public boolean hasInfraredControl() { return true; }
-                @Override public Entity infraredTarget(VehicleEntity v) { return IrMissileControl.lockedTarget(v); }
-                @Override public void infraredLaunched(net.minecraft.world.entity.projectile.Projectile shot,
+                public boolean hasInfraredControl() { return true; }
+                public Entity infraredTarget(VehicleEntity v) { return IrMissileControl.lockedTarget(v); }
+                public void infraredLaunched(net.minecraft.world.entity.projectile.Projectile shot,
                         ServerPlayer owner,VehicleEntity launcher,Entity target,cn.zzy.loadout.api.AmmoType ammo) {
                     IrMissileControl.trackLoadout(shot,owner,launcher,target,ammo.id());
                 }
